@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include<time.h>
 #include <limits.h>
+#include <stdbool.h>
+#include<time.h>
 #include "interrupts_101287292_101244907.h"
 
 
@@ -21,26 +21,22 @@ Partition* create_partition( int number,  int size){
 
 }
 
-Process* create_new_process( int pid_num, int partition_number,  int size){
-    Process* new_pcb = (Process*)malloc(sizeof(Process));
-    if (new_pcb == NULL){
-        printf("Malloc error creating new PCB");
+Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_time, int IO_frequency, int IO_duration, int partition_index){
+    Process* new_process = (Process*)malloc(sizeof(Process));
+    if (new_process == NULL){
+        printf("Malloc error creating new Process");
         exit(1);
     }
-    new_pcb->pid = pid_num;
-    new_pcb->partition_num = partition_number;
-    new_pcb->size = size;
-    strcpy(new_pcb->state, "NEW"); //Since the proccess is just created it is marked as new
-    return new_pcb;
+    new_process->pid = pid_num;
+    new_process->size = size;
+    strcpy(new_process->state, "NEW"); //Since the proccess is just created it is marked as new
+    new_process->arrival_time = arrival_time;
+    new_process->cpu_time = cpu_time;
+    new_process->IO_frequency = IO_frequency;
+    new_process->IO_duration = IO_duration;
+    new_process->partition_index = partition_index;
+    return new_process;
 
-}
-
-
-Program* create_program(char program_name[20], int memory_size){
-    Program* new_program = (Program *)malloc(sizeof(Program));
-    strcpy(new_program->program_name, program_name);
-    new_program->memory_size = memory_size;
-    return new_program;
 }
 
 
@@ -83,7 +79,7 @@ int find_partition(int size, int PID,  Partition* partitions_array[6]){
     return best_partition_index;
 }
 
-void update_memory_status(FILE *memory_status, Partition* partitions_array[6], int current_time, int size_used, int *usable_memory){
+void update_memory_status(FILE *memory_status, Partition* partitions_array[6], int current_time, int size_used, int *usable_memory, bool fill_partition){
     int total_free_memory = 0;
 
     for (int i = 0; i < 6; i++){
@@ -92,10 +88,15 @@ void update_memory_status(FILE *memory_status, Partition* partitions_array[6], i
         } 
     }
 
-    *usable_memory -= size_used;
+    if (fill_partition){
+        *usable_memory -= size_used;
+    } else {
+        *usable_memory += size_used;
+    }
+    
 
     fprintf(memory_status, "| %-14d | %-11d | %-3d, %-3d, %-3d, %-3d, %-3d, %-3d | %-17d | %-17d |\n", 
-           current_time, size_used, partitions_array[0]->PID, partitions_array[1]->PID, partitions_array[2]->PID, partitions_array[3]->PID,
+           current_time, fill_partition? size_used: 0, partitions_array[0]->PID, partitions_array[1]->PID, partitions_array[2]->PID, partitions_array[3]->PID,
             partitions_array[4]->PID, partitions_array[5]->PID, total_free_memory, *usable_memory);
 }
 
@@ -150,7 +151,7 @@ int main(int argc, char *argv[]){
     fprintf(memory_status, "+-----------------------------------------------------------------------------------------------------+\n");
     fprintf(memory_status, "| Time of Event  | Memory Used |        Partitions State      | Total Free Memory | Usable Free Memory|\n");
     fprintf(memory_status, "+-----------------------------------------------------------------------------------------------------+\n");
-    update_memory_status(memory_status, partitions_array, current_time, 0, &usable_memory);
+    update_memory_status(memory_status, partitions_array, current_time, 0, &usable_memory, true);
 
     //Begin process state table in execution file
     fprintf(execution_file, "+--------------------------------------------------+\n");
@@ -158,6 +159,9 @@ int main(int argc, char *argv[]){
     fprintf(execution_file, "+--------------------------------------------------+\n");
     
     
+    //for first example
+    Process *process;
+
     int best_partition_index;
     //Below is for parsing from input file
     int PID, size, arrival_time, CPU_time, IO_frequency, IO_duration;
@@ -169,15 +173,44 @@ int main(int argc, char *argv[]){
 
             //Mark the partition with the PID value
             partitions_array[best_partition_index]->PID = PID;
-            update_memory_status(memory_status, partitions_array, current_time, size, &usable_memory);
+            update_memory_status(memory_status, partitions_array, current_time, size, &usable_memory, true);
 
             //now we create the process
-            Process *process = create_new_process(PID, best_partition_index, size);
+            process = create_new_process(PID, size, arrival_time, CPU_time, IO_frequency, IO_duration, best_partition_index);
             strcpy(process->state, "READY");
             update_execution(execution_file, process, "NEW", current_time);
         }
+    }
+
+    //READY->RUNNING
+    strcpy(process->state, "RUNNING");
+    update_execution(execution_file, process, "READY", current_time);
+    while (process->cpu_time > process->IO_frequency){ 
+
+        //process runs RUNNING->WAITING
+        current_time += process->IO_frequency;
+        process->cpu_time -= IO_frequency;
+        strcpy(process->state, "WAITING");
+        update_execution(execution_file, process, "RUNNING", current_time);
+
+        //process does IO WAITING->READY
+        current_time += process->IO_duration;
+        strcpy(process->state, "READY");
+        update_execution(execution_file, process, "WAITING", current_time);
+
+        //READY->RUNNING
+        strcpy(process->state, "RUNNING");
+        update_execution(execution_file, process, "READY", current_time);
+
 
     }
+
+    current_time += process->cpu_time;
+    strcpy(process->state, "TERMINATED");
+    update_execution(execution_file, process, "RUNNING", current_time);
+    partitions_array[process->partition_index]->PID = -1;
+    update_memory_status(memory_status, partitions_array, current_time, process->size, &usable_memory, false);
+
 
 
     //close memory status table

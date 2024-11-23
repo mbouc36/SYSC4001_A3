@@ -17,17 +17,18 @@ typedef struct Partition
 // PCB Structure 
 typedef struct Process
 {
-    int pid; // Process identifier
-    int partition_num; // partitioner number
+    int pid; 
     int size;
     char state[30];
+    int arrival_time;
+    int cpu_time;
+    int IO_frequency;
+    int IO_duration;
+    int partition_index;
 
 }Process;
 
-typedef struct Program {
-    char program_name[20]; 
-    int memory_size;
-} Program;
+
 
 
 
@@ -41,12 +42,12 @@ int find_partition(int size, int PID,  Partition* partitions_array[6]);
 Partition* create_partition( int number,  int size);
 
 //createds a new Process to be loaded on PCB
-Process* create_new_process( int pid_num, int partition_number,  int size);
+Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_time, int IO_frequency, int IO_duration, int partition_index);
 
 //update the state of processes table
 void update_execution(FILE *execution_file, Process *process, char const old_state[20], int current_time);
 
 //updated the memory state table 
-void update_memory_status(FILE *memory_status, Partition* partitions_array[6], int current_time, int size_used, int *usable_memory);
+void update_memory_status(FILE *memory_status, Partition* partitions_array[6], int current_time, int size_used, int *usable_memory, bool fill_partition);
 
 #endif
