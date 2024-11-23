@@ -35,10 +35,103 @@ Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_ti
     new_process->IO_frequency = IO_frequency;
     new_process->IO_duration = IO_duration;
     new_process->partition_index = partition_index;
+    new_process->next = NULL;
     return new_process;
 
 }
 
+Queue* createQueue(Process** processes){
+    Queue *q = (Queue *)malloc(sizeof(Queue));
+    if (!q){
+        printf("Memory allocation failed\n");
+        return NULL;
+    }
+    q->head = processes[0];
+    for (int i = 0; i < 15; i++){
+        if (processes[i] == NULL){
+            printf("Skipping NULL process at index: %d, when creating queue\n", i);
+            continue;
+        }
+
+        if (q->head == NULL){
+            q->head =processes[i];
+            q->tail = processes[i];
+        } else {
+            q->tail->next = processes[i];
+            q->tail = processes[i];
+        }
+        processes[i]->next = NULL;
+        q->size++;
+    }
+    return q;
+}
+
+Queue* create_queue(Process ** processes){
+    Queue* new_queue = (Queue*) malloc(sizeof(Queue));
+    if (new_queue == NULL){
+        printf("Malloc error creating new queue");
+        exit(1);
+    }
+
+    new_queue->head = processes[0];
+    new_queue->tail = processes[0];
+
+    int last_index = 0;
+    for (int i = 0; i < 15; i++){
+        if (processes[i] != NULL){
+            last_index = i;
+            new_queue->tail->next = processes[i];
+            new_queue->tail = processes[i];
+
+        }
+    }
+
+    new_queue->tail = processes[last_index];
+    new_queue->size = last_index + 1;
+
+    return new_queue;
+}
+
+void enqueue(Queue *ready_queue, Process* process){
+    if (ready_queue->tail == NULL){
+        ready_queue->head = process;
+        ready_queue->tail = process;
+        
+    } else {
+        process->next = ready_queue->tail;
+        ready_queue->tail = process;
+    }
+    ready_queue->size++;
+}
+
+
+Process* dequeue(Queue *ready_queue){
+    if (ready_queue->head == NULL){
+        printf("failed to find head when dequeueing");
+        exit(1);
+    }
+
+    Process *temp = ready_queue->head;
+    ready_queue->head = temp->next; //shift head out of queue
+
+
+    //if head is null queue is empty
+    if (ready_queue->head == NULL){
+        ready_queue->tail = NULL;
+    }
+
+    temp->next = NULL;
+    ready_queue->size--;
+    return temp;
+
+}
+
+void display_ready_queue(Queue *ready_queue){
+    printf("In the ready queue we have:\n");
+    for (Process *process = ready_queue->head; process != NULL ;process = process->next){
+        printf("%d\n", process->pid);
+    }
+}
 
 void setup_read_file(FILE **filename, const char *path){
 
@@ -57,6 +150,16 @@ void setup_read_file(FILE **filename, const char *path){
 }
 
 Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_file, Partition* partitions_array[6], int* current_time, int* usable_memory){
+    //Begin memory state table in memory status file
+    fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
+    fprintf(memory_file, "| Time of Event  | Memory Used |        Partitions State      | Total Free Memory | Usable Free Memory|\n");
+    fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
+    update_memory_status(memory_file, partitions_array, *current_time, 0, usable_memory, true);
+
+    //Begin process state table in execution file
+    fprintf(execution_file, "+--------------------------------------------------+\n");
+    fprintf(execution_file, "| Time of Transition |PID | Old State | New State |\n");
+    fprintf(execution_file, "+--------------------------------------------------+\n");
     FILE  *input_file;
 
     setup_read_file(&input_file, path);
@@ -96,10 +199,7 @@ Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_fil
     fclose(input_file);
     return processes;
     
-
 }
-
-
 
 int find_partition(int size, int PID,  Partition* partitions_array[6]){
     int min_fragmentation = INT_MAX;
@@ -136,7 +236,6 @@ void update_memory_status(FILE *memory_file, Partition* partitions_array[6], int
     } else {
         *usable_memory += size_used;
     }
-    
 
     fprintf(memory_file, "| %-14d | %-11d | %-3d, %-3d, %-3d, %-3d, %-3d, %-3d | %-17d | %-17d |\n", 
            current_time, fill_partition? size_used: 0, partitions_array[0]->PID, partitions_array[1]->PID, partitions_array[2]->PID, partitions_array[3]->PID,
@@ -144,7 +243,6 @@ void update_memory_status(FILE *memory_file, Partition* partitions_array[6], int
 }
 
 void update_execution(FILE *execution_file, Process *process, char const old_state[20], int current_time){
-    //                      "| Time of Transition | PID | Old State | New State |\n"
     fprintf(execution_file, "|                 %-3d| %-2d |  %-7s  | %-10s|\n", current_time, process->pid, old_state, process->state);
 }
 
@@ -208,19 +306,15 @@ int main(int argc, char *argv[]){
         return 1;  //If file couldn't open
     }
 
-    //Begin memory state table in memory status file
-    fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
-    fprintf(memory_file, "| Time of Event  | Memory Used |        Partitions State      | Total Free Memory | Usable Free Memory|\n");
-    fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
-    update_memory_status(memory_file, partitions_array, current_time, 0, &usable_memory, true);
-
-    //Begin process state table in execution file
-    fprintf(execution_file, "+--------------------------------------------------+\n");
-    fprintf(execution_file, "| Time of Transition |PID | Old State | New State |\n");
-    fprintf(execution_file, "+--------------------------------------------------+\n");
     
     //parses input file and creates and array of processes
     Process **processes = get_processes(argv[1], memory_file, execution_file, partitions_array, &current_time, &usable_memory);
+
+    Queue *ready_queue = create_queue(processes);
+    display_ready_queue(ready_queue);
+   
+
+
 
     //READY->RUNNING
     ready_to_running(execution_file, processes[0], current_time);
@@ -276,7 +370,6 @@ int main(int argc, char *argv[]){
 
 /*
 
-Somewhere to store all processes
 
 ready queue, waiting array
 

@@ -8,9 +8,9 @@
 
 typedef struct Partition
 {
-    int PartitionNum; // partitioned number 
-    int size; // size of the memory allowed
-    int PID; // string, only use free, init, and other program name
+    int PartitionNum; 
+    int size; 
+    int PID; 
 }Partition;
 
 
@@ -25,8 +25,16 @@ typedef struct Process
     int IO_frequency;
     int IO_duration;
     int partition_index;
+    struct Process* next;
 
 }Process;
+
+typedef struct Queue
+{
+    struct Process* head;
+    struct Process* tail;
+    int size;
+} Queue;
 
 
 
@@ -65,5 +73,11 @@ void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *pro
 
 //this creates the array from the input file and creates an array of processes 
 Process** get_processes(const char *path, FILE *memory_file, FILE *execution_file, Partition* partitions_array[6], int* current_time, int* usable_memory);
+
+Queue* create_queue(Process ** processes);
+
+Process* dequeue(Queue *ready_queue);
+
+void display_ready_queue(Queue *ready_queue);
 
 #endif
