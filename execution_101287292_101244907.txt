@@ -4,12 +4,4 @@
 |                 0  | 15 |  NEW      | READY     |
 |                 0  | 12 |  NEW      | READY     |
 |                 0  | 1  |  NEW      | READY     |
-|                 0  | 15 |  READY    | RUNNING   |
-|                 11 | 15 |  RUNNING  | WAITING   |
-|                 14 | 15 |  WAITING  | READY     |
-|                 14 | 15 |  READY    | RUNNING   |
-|                 25 | 15 |  RUNNING  | WAITING   |
-|                 28 | 15 |  WAITING  | READY     |
-|                 28 | 15 |  READY    | RUNNING   |
-|                 31 | 15 |  RUNNING  | TERMINATED|
 +--------------------------------------------------+

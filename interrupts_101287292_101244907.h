@@ -29,14 +29,15 @@ typedef struct Process
 
 }Process;
 
-typedef struct Queue
-{
-    struct Process* head;
-    struct Process* tail;
-    int size;
-} Queue;
 
-
+typedef struct {
+    int queue[100];
+    int front;
+    int rear;
+    int count;
+    int active_processes;
+    int children_ran;
+} SharedMemory;
 
 
 
@@ -70,14 +71,13 @@ void waiting_to_running(FILE *execution_file, Process *process, int current_time
 // Running->Terminated state
 void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *process, Partition* partitions_array[6], int current_time, int *usable_memory);
 
-
 //this creates the array from the input file and creates an array of processes 
 Process** get_processes(const char *path, FILE *memory_file, FILE *execution_file, Partition* partitions_array[6], int* current_time, int* usable_memory);
 
-Queue* create_queue(Process ** processes);
+//sempahore wait operation
+void wait(int semid);
 
-Process* dequeue(Queue *ready_queue);
-
-void display_ready_queue(Queue *ready_queue);
+//semaphore signal operation
+void signal(int semid);
 
 #endif

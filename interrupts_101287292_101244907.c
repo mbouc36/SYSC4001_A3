@@ -3,9 +3,40 @@
 #include <string.h>
 #include <limits.h>
 #include <stdbool.h>
-#include<time.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/types.h>
+
 #include "interrupts_101287292_101244907.h"
 
+#define MAX_QUEUE_SIZE 100
+
+
+//semaphore operations
+void wait(int semid){ //semid is id for synchronization
+    struct sembuf sb = {0, -1, 0}; //specefies operation to perform in this case wait operation, -1 specefies decrmenet , wait for incrmenet (singal)
+    semop(semid, &sb, 1);  //syscall used to perform operations on semaphores, synchrnoization id, pointer to operation and number of operations
+} 
+
+void signal(int semid){ //similar to wait
+    struct sembuf sb = {0, 1, 0};
+    semop(semid, &sb, 1);
+}
+
+//Enqueue to shared memeory queue, shm is pointer to shared memeory structure
+void enqueue(SharedMemory* shm, int pid){ 
+    shm->queue[shm->rear] = pid; //places the pid at the end of the queue
+    shm->rear = (shm->rear + 1) % MAX_QUEUE_SIZE; //updates the rear pointer to the next memeory poistion in the queue for the next item to be enqueued
+}
+
+int dequeue(SharedMemory* shm){ //once again shm is a pointer to a shared memory structure
+    int pid = shm->queue[shm->front]; // gets pid at front of queue
+    shm->front = (shm->front + 1) % MAX_QUEUE_SIZE; //advances the pointer to the next position in queue
+    return pid;
+}
 
 // function to create partiotine node 
 Partition* create_partition( int number,  int size){
@@ -38,99 +69,6 @@ Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_ti
     new_process->next = NULL;
     return new_process;
 
-}
-
-Queue* createQueue(Process** processes){
-    Queue *q = (Queue *)malloc(sizeof(Queue));
-    if (!q){
-        printf("Memory allocation failed\n");
-        return NULL;
-    }
-    q->head = processes[0];
-    for (int i = 0; i < 15; i++){
-        if (processes[i] == NULL){
-            printf("Skipping NULL process at index: %d, when creating queue\n", i);
-            continue;
-        }
-
-        if (q->head == NULL){
-            q->head =processes[i];
-            q->tail = processes[i];
-        } else {
-            q->tail->next = processes[i];
-            q->tail = processes[i];
-        }
-        processes[i]->next = NULL;
-        q->size++;
-    }
-    return q;
-}
-
-Queue* create_queue(Process ** processes){
-    Queue* new_queue = (Queue*) malloc(sizeof(Queue));
-    if (new_queue == NULL){
-        printf("Malloc error creating new queue");
-        exit(1);
-    }
-
-    new_queue->head = processes[0];
-    new_queue->tail = processes[0];
-
-    int last_index = 0;
-    for (int i = 0; i < 15; i++){
-        if (processes[i] != NULL){
-            last_index = i;
-            new_queue->tail->next = processes[i];
-            new_queue->tail = processes[i];
-
-        }
-    }
-
-    new_queue->tail = processes[last_index];
-    new_queue->size = last_index + 1;
-
-    return new_queue;
-}
-
-void enqueue(Queue *ready_queue, Process* process){
-    if (ready_queue->tail == NULL){
-        ready_queue->head = process;
-        ready_queue->tail = process;
-        
-    } else {
-        process->next = ready_queue->tail;
-        ready_queue->tail = process;
-    }
-    ready_queue->size++;
-}
-
-
-Process* dequeue(Queue *ready_queue){
-    if (ready_queue->head == NULL){
-        printf("failed to find head when dequeueing");
-        exit(1);
-    }
-
-    Process *temp = ready_queue->head;
-    ready_queue->head = temp->next; //shift head out of queue
-
-
-    //if head is null queue is empty
-    if (ready_queue->head == NULL){
-        ready_queue->tail = NULL;
-    }
-
-    temp->next = NULL;
-    ready_queue->size--;
-    return temp;
-
-}
-
-void display_ready_queue(Queue *ready_queue){
-    printf("In the ready queue we have:\n");
-    for (Process *process = ready_queue->head; process != NULL ;process = process->next){
-        printf("%d\n", process->pid);
-    }
 }
 
 void setup_read_file(FILE **filename, const char *path){
@@ -309,34 +247,100 @@ int main(int argc, char *argv[]){
     
     //parses input file and creates and array of processes
     Process **processes = get_processes(argv[1], memory_file, execution_file, partitions_array, &current_time, &usable_memory);
+    //clear printing buffers for output files
+    fflush(execution_file);
+    fflush(memory_file);
 
-    Queue *ready_queue = create_queue(processes);
-    display_ready_queue(ready_queue);
-   
-
-
-
-    //READY->RUNNING
-    ready_to_running(execution_file, processes[0], current_time);
-    while (processes[0]->cpu_time > processes[0]->IO_frequency){ 
-
-        //process runs RUNNING->WAITING
-        current_time += processes[0]->IO_frequency;
-        running_to_waiting(execution_file, processes[0], current_time);
-
-        //process does IO WAITING->READY
-        current_time += processes[0]->IO_duration;
-        waiting_to_running(execution_file, processes[0], current_time);
-
-        //READY->RUNNING
-        ready_to_running(execution_file, processes[0], current_time);
+    //get number of processes
+    int num_processes = 0;
+    for (int i = 0; i < 15; i++){
+        if (processes[i] != NULL){
+            num_processes++;
+        }
     }
 
-    current_time += processes[0]->cpu_time;
-    running_to_terminated(execution_file, memory_file, processes[0], partitions_array, current_time, &usable_memory);
+    // //create semaphore queue
+    key_t key = ftok("shmfile", 65); // generates unique queue for shared memeory
+    int shmid = shmget(key, sizeof(SharedMemory), 0666 | IPC_CREAT); // allocates a shared memory segment or accesses it if already created
+    
+    SharedMemory* shm = (SharedMemory*)shmat(shmid, NULL, 0); // attach shared memory segment to the process address space 
+
+    shm->front = 0;
+    shm->rear = 0;
+    shm->count = 0;
+    shm->active_processes = num_processes;
+    shm->children_ran = 0;
+
+
+    // // // semaphore for synchronization
+    int sem_parent = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT); //Semaphore for parent
+    int sem_children = semget(IPC_PRIVATE, 1, 0666 |IPC_CREAT);
+
+    semctl(sem_parent, 0, SETVAL, 0);  //init sempahore to 0 (open)
+    semctl(sem_children, 0, SETVAL, 1);
+
+    pid_t pids[15];
+
+    
+    for (int i = 0; i < 3; i++){
+        //loop for children
+        if ((pids[i] = fork())==0){
+            int pid = getpid();
+            //enqueue(shm, pid);
+            while (1) {  //child process
+                wait(sem_children);
+                //Enqueue to shared memory queue
+                
+                
+
+
+                shm->children_ran++;
+                //check if all children have ran before calling parent
+                if (shm->children_ran == num_processes) {
+                    signal(sem_parent);
+                    usleep(100);
+                    shm->children_ran = 0;
+                } else {
+                    signal(sem_children);
+                }
+                
+
+                if (shm->count == 5){
+                    break;
+                }
 
 
 
+            }
+            
+            shm->active_processes--;
+            printf("Process %d exited.\n", pid);
+            exit(0);
+        } 
+    }
+
+
+    //loop for parent
+    while (1){
+        wait(sem_parent);
+        sleep(1);
+    
+        shm->count++; //increment time
+        printf("Parent increment %d\n", shm->count);
+
+        //check if there are still children
+        if (shm->active_processes == 0){
+            break;
+        }
+        signal(sem_children);
+        sleep(1);
+
+    }
+
+    shmdt(shm);
+    shmctl(shmid, IPC_RMID, NULL);
+    semctl(sem_parent, 0, IPC_RMID);
+    semctl(sem_children, 0, IPC_RMID);
 
     //close memory status table
     fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
