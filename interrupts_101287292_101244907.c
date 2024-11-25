@@ -3,7 +3,8 @@
 #include <string.h>
 #include <limits.h>
 #include <stdbool.h>
-#include<time.h>
+#include <time.h>
+#include <unistd.h>
 #include "interrupts_101287292_101244907.h"
 
 
@@ -36,20 +37,23 @@ Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_ti
     new_process->IO_duration = IO_duration;
     new_process->partition_index = partition_index;
     new_process->next = NULL;
+    new_process->current_IO_time = new_process->IO_duration;
     return new_process;
 
 }
 
-Queue* createQueue(Process** processes){
+Queue* create_queue(Process** processes){
     Queue *q = (Queue *)malloc(sizeof(Queue));
-    if (!q){
+    if (q == NULL){
         printf("Memory allocation failed\n");
-        return NULL;
+        exit(0);
     }
     q->head = processes[0];
-    for (int i = 0; i < 15; i++){
-        if (processes[i] == NULL){
-            printf("Skipping NULL process at index: %d, when creating queue\n", i);
+    q->tail = processes[0];
+
+    q->size = 1;
+    for (int i = 1; i < 15; i++){
+        if (processes[i] == NULL){// don't need to service
             continue;
         }
 
@@ -66,39 +70,15 @@ Queue* createQueue(Process** processes){
     return q;
 }
 
-Queue* create_queue(Process ** processes){
-    Queue* new_queue = (Queue*) malloc(sizeof(Queue));
-    if (new_queue == NULL){
-        printf("Malloc error creating new queue");
-        exit(1);
-    }
-
-    new_queue->head = processes[0];
-    new_queue->tail = processes[0];
-
-    int last_index = 0;
-    for (int i = 0; i < 15; i++){
-        if (processes[i] != NULL){
-            last_index = i;
-            new_queue->tail->next = processes[i];
-            new_queue->tail = processes[i];
-
-        }
-    }
-
-    new_queue->tail = processes[last_index];
-    new_queue->size = last_index + 1;
-
-    return new_queue;
-}
 
 void enqueue(Queue *ready_queue, Process* process){
-    if (ready_queue->tail == NULL){
+    process->next = NULL;
+    if (ready_queue->head == NULL){
         ready_queue->head = process;
         ready_queue->tail = process;
         
     } else {
-        process->next = ready_queue->tail;
+        ready_queue->tail->next = process;
         ready_queue->tail = process;
     }
     ready_queue->size++;
@@ -108,17 +88,11 @@ void enqueue(Queue *ready_queue, Process* process){
 Process* dequeue(Queue *ready_queue){
     if (ready_queue->head == NULL){
         printf("failed to find head when dequeueing");
-        exit(1);
+        return NULL;
     }
 
     Process *temp = ready_queue->head;
-    ready_queue->head = temp->next; //shift head out of queue
-
-
-    //if head is null queue is empty
-    if (ready_queue->head == NULL){
-        ready_queue->tail = NULL;
-    }
+    ready_queue->head = ready_queue->head->next; //shift head out of queue
 
     temp->next = NULL;
     ready_queue->size--;
@@ -196,6 +170,10 @@ Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_fil
             i++;
         }
     }
+    //set all other elements to null
+    for (;i < 15 ; i++){
+        processes[i] = NULL;
+    }
     fclose(input_file);
     return processes;
     
@@ -252,12 +230,11 @@ void ready_to_running(FILE *execution_file, Process *process, int current_time){
 }
 
 void running_to_waiting(FILE *execution_file, Process *process, int current_time){
-    process->cpu_time -= process->IO_frequency;
     strcpy(process->state, "WAITING");
     update_execution(execution_file, process, "RUNNING", current_time);
 }
 
-void waiting_to_running(FILE *execution_file, Process *process, int current_time){
+void waiting_to_ready(FILE *execution_file, Process *process, int current_time){
     strcpy(process->state, "READY");
     update_execution(execution_file, process, "WAITING", current_time);
 }
@@ -267,6 +244,35 @@ void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *pro
     update_execution(execution_file, process, "RUNNING", current_time);
     partitions_array[process->partition_index]->PID = -1;
     update_memory_status(memory_file, partitions_array, current_time, process->size, usable_memory, false);
+}
+
+
+void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time){
+    if (*processes_waiting > 0){
+            for (int i = 0; i < 15; i++){
+                if (waiting_array[i] != NULL){
+                    Process *process = waiting_array[i]; 
+                    process->current_IO_time--;
+                    if (process->current_IO_time == 0){
+                        enqueue(ready_queue, process);
+                        printf("ENQUEUE size of queue: %d\n", ready_queue->size );
+                        display_ready_queue(ready_queue);
+                        process->current_IO_time = process->IO_duration;
+                        waiting_array[i] = NULL; // clear position in array
+                        (*processes_waiting)--;
+                        printf("Process %d goes to ready, processes waiting: %d\n", process->pid, *processes_waiting);
+                        waiting_to_ready(execution_file, process, current_time);
+                        //shift down array elements
+                        for (int j = i; j < 14; j++){
+                            waiting_array[j] = waiting_array[j + 1];
+                        }
+                        waiting_array[14] = NULL;
+                        i--;//reset i to ensure all elements are serviced
+                        
+                    }
+                }
+            }
+        }
 }
 
 int main(int argc, char *argv[]){
@@ -294,8 +300,7 @@ int main(int argc, char *argv[]){
 
 
     //Let's prepare the output files
-    char *execution_file_name = argv[2];
-    execution_file = fopen(execution_file_name, "w");
+    execution_file = fopen("execution_101287292_101244907.txt", "w");
     if (execution_file == NULL) {
         printf("Error opening file.\n");
         return 1;  //If file couldn't open
@@ -308,33 +313,95 @@ int main(int argc, char *argv[]){
 
     
     //parses input file and creates and array of processes
-    Process **processes = get_processes(argv[1], memory_file, execution_file, partitions_array, &current_time, &usable_memory);
+    Process **processes = get_processes("input_data_101287292_101244907.txt", memory_file, execution_file, partitions_array, &current_time, &usable_memory);
+
 
     Queue *ready_queue = create_queue(processes);
-    display_ready_queue(ready_queue);
-   
 
 
-
-    //READY->RUNNING
-    ready_to_running(execution_file, processes[0], current_time);
-    while (processes[0]->cpu_time > processes[0]->IO_frequency){ 
-
-        //process runs RUNNING->WAITING
-        current_time += processes[0]->IO_frequency;
-        running_to_waiting(execution_file, processes[0], current_time);
-
-        //process does IO WAITING->READY
-        current_time += processes[0]->IO_duration;
-        waiting_to_running(execution_file, processes[0], current_time);
-
-        //READY->RUNNING
-        ready_to_running(execution_file, processes[0], current_time);
+    //get number of processes we will need to handle before temrinating 
+    int total_num_processes = 0;
+    for (int i = 0; i < 15; i++){
+        if (processes[i] != NULL){
+            total_num_processes++;
+        }
     }
 
-    current_time += processes[0]->cpu_time;
-    running_to_terminated(execution_file, memory_file, processes[0], partitions_array, current_time, &usable_memory);
+    printf("the total num of processes: %d\n", total_num_processes);
 
+    // prpccesses in waiting
+    Process *waiting_array[15] = {NULL};
+    int processes_waiting = 0;
+    for (int i = 0; i < 15; i++){
+        if (waiting_array[i] != NULL){
+            processes_waiting++;
+        }
+    }
+
+    Process* running_process = NULL;
+    int next_IO;
+    while (total_num_processes > 0){
+        
+        if (current_time % 10 == 0 ) {
+            printf("At time: %d\n", current_time);
+            //display_ready_queue(ready_queue); 
+        }
+        
+        if (running_process == NULL){
+            if (ready_queue->size > 0 ){
+                running_process = dequeue(ready_queue);
+                printf("DEQUEUE size of queue: %d\n", ready_queue->size );
+                printf("Process %d is running\n", running_process->pid);
+                ready_to_running(execution_file, running_process, current_time);
+                next_IO = running_process->IO_frequency;
+
+            } else { // no elements in ready queue keep incrementing time
+                service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+                current_time++;
+                continue;
+            } 
+
+            if (current_time == 0){
+                current_time++;
+                continue;
+            }
+        }
+
+
+        running_process->cpu_time--;
+        next_IO--;
+        service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+        if (running_process->cpu_time == 0){
+            printf("Process %d terminates\n", running_process->pid);
+            running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
+            running_process = NULL;
+            total_num_processes--;
+            if (ready_queue->size > 0 ){
+                running_process = dequeue(ready_queue);
+                printf("Process %d is running\n", running_process->pid);
+                ready_to_running(execution_file, running_process, current_time);
+                next_IO = running_process->IO_frequency;
+            }
+
+           
+        } else if (next_IO == 0){
+            printf("Process %d goes to waiting, processes waiting: %d\n", running_process->pid, processes_waiting + 1);
+            running_to_waiting(execution_file, running_process, current_time);
+            waiting_array[processes_waiting] = running_process;
+            processes_waiting++;
+            running_process = NULL;
+            if (ready_queue->size > 0 ){
+                running_process = dequeue(ready_queue);
+                printf("Process %d is running\n", running_process->pid);
+                ready_to_running(execution_file, running_process, current_time);
+                next_IO = running_process->IO_frequency;
+            }
+
+        } 
+            
+        current_time++;
+
+    }
 
 
 

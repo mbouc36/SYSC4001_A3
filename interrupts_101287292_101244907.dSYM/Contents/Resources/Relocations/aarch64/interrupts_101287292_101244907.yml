@@ -1,39 +1,39 @@
 ---
 triple:          'arm64-apple-darwin'
-binary-path:     interrupts_101287292_101244907
+binary-path:     '/Users/michaelb/Documents/GitHub/SYSC4001_A3/interrupts_101287292_101244907'
 relocations:
-  - { offsetInCU: 0xAD, offset: 0xAD, size: 0x8, addend: 0x0, symName: __Z16create_partitionii, symObjAddr: 0x0, symBinAddr: 0x1000026BC, symSize: 0x6C }
-  - { offsetInCU: 0xE93, offset: 0xE93, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xD70, symBinAddr: 0x10000342C, symSize: 0x370 }
-  - { offsetInCU: 0x105A, offset: 0x105A, size: 0x8, addend: 0x0, symName: __Z21running_to_terminatedP7__sFILES0_P7ProcessPP9PartitioniPi, symObjAddr: 0xCC0, symBinAddr: 0x10000337C, symSize: 0xB0 }
-  - { offsetInCU: 0x1062, offset: 0x1062, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xD70, symBinAddr: 0x10000342C, symSize: 0x370 }
-  - { offsetInCU: 0x10F2, offset: 0x10F2, size: 0x8, addend: 0x0, symName: __Z18waiting_to_runningP7__sFILEP7Processi, symObjAddr: 0xC64, symBinAddr: 0x100003320, symSize: 0x5C }
-  - { offsetInCU: 0x10FA, offset: 0x10FA, size: 0x8, addend: 0x0, symName: __Z21running_to_terminatedP7__sFILES0_P7ProcessPP9PartitioniPi, symObjAddr: 0xCC0, symBinAddr: 0x10000337C, symSize: 0xB0 }
-  - { offsetInCU: 0x1150, offset: 0x1150, size: 0x8, addend: 0x0, symName: __Z18running_to_waitingP7__sFILEP7Processi, symObjAddr: 0xBF4, symBinAddr: 0x1000032B0, symSize: 0x70 }
-  - { offsetInCU: 0x1158, offset: 0x1158, size: 0x8, addend: 0x0, symName: __Z18waiting_to_runningP7__sFILEP7Processi, symObjAddr: 0xC64, symBinAddr: 0x100003320, symSize: 0x5C }
-  - { offsetInCU: 0x11A7, offset: 0x11A7, size: 0x8, addend: 0x0, symName: __Z16ready_to_runningP7__sFILEP7Processi, symObjAddr: 0xBA0, symBinAddr: 0x10000325C, symSize: 0x54 }
-  - { offsetInCU: 0x11AF, offset: 0x11AF, size: 0x8, addend: 0x0, symName: __Z18running_to_waitingP7__sFILEP7Processi, symObjAddr: 0xBF4, symBinAddr: 0x1000032B0, symSize: 0x70 }
-  - { offsetInCU: 0x1205, offset: 0x1205, size: 0x8, addend: 0x0, symName: __Z16update_executionP7__sFILEP7ProcessPKci, symObjAddr: 0xB3C, symBinAddr: 0x1000031F8, symSize: 0x64 }
-  - { offsetInCU: 0x120D, offset: 0x120D, size: 0x8, addend: 0x0, symName: __Z16ready_to_runningP7__sFILEP7Processi, symObjAddr: 0xBA0, symBinAddr: 0x10000325C, symSize: 0x54 }
-  - { offsetInCU: 0x127F, offset: 0x127F, size: 0x8, addend: 0x0, symName: __Z20update_memory_statusP7__sFILEPP9PartitioniiPib, symObjAddr: 0x99C, symBinAddr: 0x100003058, symSize: 0x1A0 }
-  - { offsetInCU: 0x1287, offset: 0x1287, size: 0x8, addend: 0x0, symName: __Z16update_executionP7__sFILEP7ProcessPKci, symObjAddr: 0xB3C, symBinAddr: 0x1000031F8, symSize: 0x64 }
-  - { offsetInCU: 0x133E, offset: 0x133E, size: 0x8, addend: 0x0, symName: __Z14find_partitioniiPP9Partition, symObjAddr: 0x888, symBinAddr: 0x100002F44, symSize: 0x114 }
-  - { offsetInCU: 0x1346, offset: 0x1346, size: 0x8, addend: 0x0, symName: __Z20update_memory_statusP7__sFILEPP9PartitioniiPib, symObjAddr: 0x99C, symBinAddr: 0x100003058, symSize: 0x1A0 }
-  - { offsetInCU: 0x13FC, offset: 0x13FC, size: 0x8, addend: 0x0, symName: __Z13get_processesPKcP7__sFILES2_PP9PartitionPiS6_, symObjAddr: 0x5CC, symBinAddr: 0x100002C88, symSize: 0x2BC }
-  - { offsetInCU: 0x1404, offset: 0x1404, size: 0x8, addend: 0x0, symName: __Z14find_partitioniiPP9Partition, symObjAddr: 0x888, symBinAddr: 0x100002F44, symSize: 0x114 }
-  - { offsetInCU: 0x158A, offset: 0x158A, size: 0x8, addend: 0x0, symName: __Z15setup_read_filePP7__sFILEPKc, symObjAddr: 0x520, symBinAddr: 0x100002BDC, symSize: 0xAC }
-  - { offsetInCU: 0x1592, offset: 0x1592, size: 0x8, addend: 0x0, symName: __Z13get_processesPKcP7__sFILES2_PP9PartitionPiS6_, symObjAddr: 0x5CC, symBinAddr: 0x100002C88, symSize: 0x2BC }
-  - { offsetInCU: 0x1605, offset: 0x1605, size: 0x8, addend: 0x0, symName: __Z19display_ready_queueP5Queue, symObjAddr: 0x4B0, symBinAddr: 0x100002B6C, symSize: 0x70 }
-  - { offsetInCU: 0x160D, offset: 0x160D, size: 0x8, addend: 0x0, symName: __Z15setup_read_filePP7__sFILEPKc, symObjAddr: 0x520, symBinAddr: 0x100002BDC, symSize: 0xAC }
-  - { offsetInCU: 0x164A, offset: 0x164A, size: 0x8, addend: 0x0, symName: __Z7dequeueP5Queue, symObjAddr: 0x424, symBinAddr: 0x100002AE0, symSize: 0x8C }
-  - { offsetInCU: 0x1652, offset: 0x1652, size: 0x8, addend: 0x0, symName: __Z19display_ready_queueP5Queue, symObjAddr: 0x4B0, symBinAddr: 0x100002B6C, symSize: 0x70 }
-  - { offsetInCU: 0x169F, offset: 0x169F, size: 0x8, addend: 0x0, symName: __Z7enqueueP5QueueP7Process, symObjAddr: 0x3B0, symBinAddr: 0x100002A6C, symSize: 0x74 }
-  - { offsetInCU: 0x16A7, offset: 0x16A7, size: 0x8, addend: 0x0, symName: __Z7dequeueP5Queue, symObjAddr: 0x424, symBinAddr: 0x100002AE0, symSize: 0x8C }
-  - { offsetInCU: 0x16F0, offset: 0x16F0, size: 0x8, addend: 0x0, symName: __Z12create_queuePP7Process, symObjAddr: 0x29C, symBinAddr: 0x100002958, symSize: 0x114 }
-  - { offsetInCU: 0x16F8, offset: 0x16F8, size: 0x8, addend: 0x0, symName: __Z7enqueueP5QueueP7Process, symObjAddr: 0x3B0, symBinAddr: 0x100002A6C, symSize: 0x74 }
-  - { offsetInCU: 0x1776, offset: 0x1776, size: 0x8, addend: 0x0, symName: __Z11createQueuePP7Process, symObjAddr: 0x138, symBinAddr: 0x1000027F4, symSize: 0x164 }
-  - { offsetInCU: 0x177E, offset: 0x177E, size: 0x8, addend: 0x0, symName: __Z12create_queuePP7Process, symObjAddr: 0x29C, symBinAddr: 0x100002958, symSize: 0x114 }
-  - { offsetInCU: 0x17F6, offset: 0x17F6, size: 0x8, addend: 0x0, symName: __Z18create_new_processiiiiiii, symObjAddr: 0x6C, symBinAddr: 0x100002728, symSize: 0xCC }
-  - { offsetInCU: 0x17FE, offset: 0x17FE, size: 0x8, addend: 0x0, symName: __Z11createQueuePP7Process, symObjAddr: 0x138, symBinAddr: 0x1000027F4, symSize: 0x164 }
-  - { offsetInCU: 0x18AF, offset: 0x18AF, size: 0x8, addend: 0x0, symName: __Z16create_partitionii, symObjAddr: 0x0, symBinAddr: 0x1000026BC, symSize: 0x6C }
-  - { offsetInCU: 0x18B7, offset: 0x18B7, size: 0x8, addend: 0x0, symName: __Z18create_new_processiiiiiii, symObjAddr: 0x6C, symBinAddr: 0x100002728, symSize: 0xCC }
+  - { offsetInCU: 0xDA, offset: 0xDA, size: 0x8, addend: 0x0, symName: __Z16create_partitionii, symObjAddr: 0x0, symBinAddr: 0x1000022F0, symSize: 0x6C }
+  - { offsetInCU: 0xEA6, offset: 0xEA6, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xE34, symBinAddr: 0x100003124, symSize: 0x570 }
+  - { offsetInCU: 0x110C, offset: 0x110C, size: 0x8, addend: 0x0, symName: __Z15service_waitingP7__sFILEPP7ProcessPiP5Queuei, symObjAddr: 0xC7C, symBinAddr: 0x100002F6C, symSize: 0x1B8 }
+  - { offsetInCU: 0x1114, offset: 0x1114, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xE34, symBinAddr: 0x100003124, symSize: 0x570 }
+  - { offsetInCU: 0x121A, offset: 0x121A, size: 0x8, addend: 0x0, symName: __Z21running_to_terminatedP7__sFILES0_P7ProcessPP9PartitioniPi, symObjAddr: 0xBCC, symBinAddr: 0x100002EBC, symSize: 0xB0 }
+  - { offsetInCU: 0x1222, offset: 0x1222, size: 0x8, addend: 0x0, symName: __Z15service_waitingP7__sFILEPP7ProcessPiP5Queuei, symObjAddr: 0xC7C, symBinAddr: 0x100002F6C, symSize: 0x1B8 }
+  - { offsetInCU: 0x129D, offset: 0x129D, size: 0x8, addend: 0x0, symName: __Z16waiting_to_readyP7__sFILEP7Processi, symObjAddr: 0xB70, symBinAddr: 0x100002E60, symSize: 0x5C }
+  - { offsetInCU: 0x12A5, offset: 0x12A5, size: 0x8, addend: 0x0, symName: __Z21running_to_terminatedP7__sFILES0_P7ProcessPP9PartitioniPi, symObjAddr: 0xBCC, symBinAddr: 0x100002EBC, symSize: 0xB0 }
+  - { offsetInCU: 0x12FC, offset: 0x12FC, size: 0x8, addend: 0x0, symName: __Z18running_to_waitingP7__sFILEP7Processi, symObjAddr: 0xB1C, symBinAddr: 0x100002E0C, symSize: 0x54 }
+  - { offsetInCU: 0x1304, offset: 0x1304, size: 0x8, addend: 0x0, symName: __Z16waiting_to_readyP7__sFILEP7Processi, symObjAddr: 0xB70, symBinAddr: 0x100002E60, symSize: 0x5C }
+  - { offsetInCU: 0x1353, offset: 0x1353, size: 0x8, addend: 0x0, symName: __Z16ready_to_runningP7__sFILEP7Processi, symObjAddr: 0xAC8, symBinAddr: 0x100002DB8, symSize: 0x54 }
+  - { offsetInCU: 0x135B, offset: 0x135B, size: 0x8, addend: 0x0, symName: __Z18running_to_waitingP7__sFILEP7Processi, symObjAddr: 0xB1C, symBinAddr: 0x100002E0C, symSize: 0x54 }
+  - { offsetInCU: 0x13B1, offset: 0x13B1, size: 0x8, addend: 0x0, symName: __Z16update_executionP7__sFILEP7ProcessPKci, symObjAddr: 0xA64, symBinAddr: 0x100002D54, symSize: 0x64 }
+  - { offsetInCU: 0x13B9, offset: 0x13B9, size: 0x8, addend: 0x0, symName: __Z16ready_to_runningP7__sFILEP7Processi, symObjAddr: 0xAC8, symBinAddr: 0x100002DB8, symSize: 0x54 }
+  - { offsetInCU: 0x142B, offset: 0x142B, size: 0x8, addend: 0x0, symName: __Z20update_memory_statusP7__sFILEPP9PartitioniiPib, symObjAddr: 0x8C4, symBinAddr: 0x100002BB4, symSize: 0x1A0 }
+  - { offsetInCU: 0x1433, offset: 0x1433, size: 0x8, addend: 0x0, symName: __Z16update_executionP7__sFILEP7ProcessPKci, symObjAddr: 0xA64, symBinAddr: 0x100002D54, symSize: 0x64 }
+  - { offsetInCU: 0x14EA, offset: 0x14EA, size: 0x8, addend: 0x0, symName: __Z14find_partitioniiPP9Partition, symObjAddr: 0x7B0, symBinAddr: 0x100002AA0, symSize: 0x114 }
+  - { offsetInCU: 0x14F2, offset: 0x14F2, size: 0x8, addend: 0x0, symName: __Z20update_memory_statusP7__sFILEPP9PartitioniiPib, symObjAddr: 0x8C4, symBinAddr: 0x100002BB4, symSize: 0x1A0 }
+  - { offsetInCU: 0x15A8, offset: 0x15A8, size: 0x8, addend: 0x0, symName: __Z13get_processesPKcP7__sFILES2_PP9PartitionPiS6_, symObjAddr: 0x4C4, symBinAddr: 0x1000027B4, symSize: 0x2EC }
+  - { offsetInCU: 0x15B0, offset: 0x15B0, size: 0x8, addend: 0x0, symName: __Z14find_partitioniiPP9Partition, symObjAddr: 0x7B0, symBinAddr: 0x100002AA0, symSize: 0x114 }
+  - { offsetInCU: 0x1736, offset: 0x1736, size: 0x8, addend: 0x0, symName: __Z15setup_read_filePP7__sFILEPKc, symObjAddr: 0x418, symBinAddr: 0x100002708, symSize: 0xAC }
+  - { offsetInCU: 0x173E, offset: 0x173E, size: 0x8, addend: 0x0, symName: __Z13get_processesPKcP7__sFILES2_PP9PartitionPiS6_, symObjAddr: 0x4C4, symBinAddr: 0x1000027B4, symSize: 0x2EC }
+  - { offsetInCU: 0x17B1, offset: 0x17B1, size: 0x8, addend: 0x0, symName: __Z19display_ready_queueP5Queue, symObjAddr: 0x3A8, symBinAddr: 0x100002698, symSize: 0x70 }
+  - { offsetInCU: 0x17B9, offset: 0x17B9, size: 0x8, addend: 0x0, symName: __Z15setup_read_filePP7__sFILEPKc, symObjAddr: 0x418, symBinAddr: 0x100002708, symSize: 0xAC }
+  - { offsetInCU: 0x17F6, offset: 0x17F6, size: 0x8, addend: 0x0, symName: __Z7dequeueP5Queue, symObjAddr: 0x330, symBinAddr: 0x100002620, symSize: 0x78 }
+  - { offsetInCU: 0x17FE, offset: 0x17FE, size: 0x8, addend: 0x0, symName: __Z19display_ready_queueP5Queue, symObjAddr: 0x3A8, symBinAddr: 0x100002698, symSize: 0x70 }
+  - { offsetInCU: 0x184B, offset: 0x184B, size: 0x8, addend: 0x0, symName: __Z7enqueueP5QueueP7Process, symObjAddr: 0x2B4, symBinAddr: 0x1000025A4, symSize: 0x7C }
+  - { offsetInCU: 0x1853, offset: 0x1853, size: 0x8, addend: 0x0, symName: __Z7dequeueP5Queue, symObjAddr: 0x330, symBinAddr: 0x100002620, symSize: 0x78 }
+  - { offsetInCU: 0x189C, offset: 0x189C, size: 0x8, addend: 0x0, symName: __Z12create_queuePP7Process, symObjAddr: 0x148, symBinAddr: 0x100002438, symSize: 0x16C }
+  - { offsetInCU: 0x18A4, offset: 0x18A4, size: 0x8, addend: 0x0, symName: __Z7enqueueP5QueueP7Process, symObjAddr: 0x2B4, symBinAddr: 0x1000025A4, symSize: 0x7C }
+  - { offsetInCU: 0x191A, offset: 0x191A, size: 0x8, addend: 0x0, symName: __Z18create_new_processiiiiiii, symObjAddr: 0x6C, symBinAddr: 0x10000235C, symSize: 0xDC }
+  - { offsetInCU: 0x1922, offset: 0x1922, size: 0x8, addend: 0x0, symName: __Z12create_queuePP7Process, symObjAddr: 0x148, symBinAddr: 0x100002438, symSize: 0x16C }
+  - { offsetInCU: 0x19D3, offset: 0x19D3, size: 0x8, addend: 0x0, symName: __Z16create_partitionii, symObjAddr: 0x0, symBinAddr: 0x1000022F0, symSize: 0x6C }
+  - { offsetInCU: 0x19DB, offset: 0x19DB, size: 0x8, addend: 0x0, symName: __Z18create_new_processiiiiiii, symObjAddr: 0x6C, symBinAddr: 0x10000235C, symSize: 0xDC }
 ...

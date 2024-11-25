@@ -24,6 +24,7 @@ typedef struct Process
     int cpu_time;
     int IO_frequency;
     int IO_duration;
+    int current_IO_time;
     int partition_index;
     struct Process* next;
 
@@ -65,7 +66,7 @@ void ready_to_running(FILE *execution_file, Process *process, int current_time);
 void running_to_waiting(FILE *execution_file, Process *process, int current_time);
 
 // Waiting->Running state
-void waiting_to_running(FILE *execution_file, Process *process, int current_time);
+void waiting_to_ready(FILE *execution_file, Process *process, int current_time);
 
 // Running->Terminated state
 void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *process, Partition* partitions_array[6], int current_time, int *usable_memory);
@@ -79,5 +80,8 @@ Queue* create_queue(Process ** processes);
 Process* dequeue(Queue *ready_queue);
 
 void display_ready_queue(Queue *ready_queue);
+
+//service processes that are currently waiting
+void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time);
 
 #endif
