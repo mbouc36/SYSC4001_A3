@@ -37,49 +37,131 @@ Process* create_new_process( int pid_num, int size, int arrival_time, int cpu_ti
     new_process->IO_duration = IO_duration;
     new_process->partition_index = partition_index;
     new_process->next = NULL;
-    new_process->current_IO_time = new_process->IO_duration;
+    new_process->current_state_time = new_process->IO_duration; 
     return new_process;
 
 }
 
-Queue* create_queue(Process** processes){
+Queue* create_queue(Process** processes, Process *late_processes[15]){
     Queue *q = (Queue *)malloc(sizeof(Queue));
     if (q == NULL){
         printf("Memory allocation failed\n");
         exit(0);
     }
-    q->head = processes[0];
-    q->tail = processes[0];
 
-    q->size = 1;
-    for (int i = 1; i < 15; i++){
+    q->head = NULL;
+    q->tail = NULL;
+
+    q->size = 0;
+    for (int i = 0; i < 15; i++){
         if (processes[i] == NULL){// don't need to service
             continue;
         }
 
-        if (q->head == NULL){
-            q->head =processes[i];
-            q->tail = processes[i];
+        if (processes[i]->arrival_time == 0){
+            if (q->head == NULL){
+                q->head =processes[i];
+                q->tail = processes[i];
+            } else {
+                Process *p = q->head;
+
+                //traverse link list till we fit accordingly
+                while(processes[i]->pid > p->pid ){
+
+                    //reached tail
+                    if (p->next == NULL){
+                        p->next = processes[i];
+                        q->tail = processes[i];
+                        processes[i]->next = NULL;
+                        break; 
+                    } else if (processes[i]->pid >= p->next->pid){
+                        p = p->next;
+                    } else {
+                        processes[i]->next = p->next;
+                        p->next = processes[i];
+                        break;
+                    }
+                    
+                }
+
+                if (p == q->head){ //processes is new head
+                    processes[i]->next = q->head;
+                    q->head = processes[i];
+                }
+                
+            }
+            printf("Loaded process: %d\n", processes[i]->pid);
+            q->size++;
         } else {
-            q->tail->next = processes[i];
-            q->tail = processes[i];
+            late_processes[i] = processes[i];
+            processes[i]->current_state_time = processes[i]->arrival_time;
         }
-        processes[i]->next = NULL;
-        q->size++;
+        
     }
+
+
     return q;
 }
 
 
 void enqueue(Queue *ready_queue, Process* process){
     process->next = NULL;
+    
+    //set process as next head
     if (ready_queue->head == NULL){
         ready_queue->head = process;
         ready_queue->tail = process;
         
     } else {
-        ready_queue->tail->next = process;
-        ready_queue->tail = process;
+        Process *p = ready_queue->head;
+        
+        //place the new process in according to it's arrival time
+        while (process->arrival_time > p->arrival_time){
+            
+                    //reached tail
+                    if (p->next == NULL){
+                        p->next = process;
+                        ready_queue->tail = process;
+                        process->next = NULL;
+                        break; 
+
+                        //current process arrives later then the next process, note if the arrival time is the same we want to place it before
+                    } else if (process->arrival_time > p->next->arrival_time){ 
+                        p = p->next;
+                    } else { //current process has found it position
+                        process->next = p->next;
+                        p->next = process;
+                        break;
+                    }
+
+        }
+
+        //now place the process based on pid
+
+        
+        while (process->pid > p->pid && process->arrival_time == p->arrival_time){
+            //reached tail
+            if (p->next == NULL){
+                p->next = process;
+                ready_queue->tail = process;
+                process->next = NULL;
+                break; 
+            } else if (process->pid >= p->next->pid){
+                p = p->next;
+            } else {
+                process->next = p->next;
+                p->next = process;
+                break;
+            }
+            
+        } 
+
+        //new process is head
+        if (process->arrival_time < ready_queue->head->arrival_time || (process->arrival_time == ready_queue->head->arrival_time && process->pid < ready_queue->head->pid)){
+            process->next = ready_queue->head;
+            ready_queue->head = process;
+        } 
+
     }
     ready_queue->size++;
 }
@@ -164,8 +246,11 @@ Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_fil
 
             //now we create the process
             process = create_new_process(PID, size, arrival_time, CPU_time, IO_frequency, IO_duration, best_partition_index);
-            strcpy(process->state, "READY");
-            update_execution(execution_file, process, "NEW", *current_time);
+            if (process->arrival_time == 0){
+                strcpy(process->state, "READY");
+                update_execution(execution_file, process, "NEW", *current_time);
+            }
+            
             processes[i] = process;
             i++;
         }
@@ -246,18 +331,40 @@ void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *pro
     update_memory_status(memory_file, partitions_array, current_time, process->size, usable_memory, false);
 }
 
+//this function returns false when there is no more late processes to load
+bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late_processes[15], int current_time){
+    bool any_late_process = false;
+    for (int i = 0; i < 15 ;i++){
+        if (late_processes[i] != NULL){        
+            if (late_processes[i]->current_state_time > 0){
+                any_late_process = true;
+                late_processes[i]->current_state_time--;
+            } else {
+                printf("Loaded late process: %d\n", late_processes[i]->pid);
+                enqueue(ready_queue, late_processes[i]);
+                late_processes[i]->current_state_time = late_processes[i]->IO_duration;
+                strcpy(late_processes[i]->state, "READY");
+                update_execution(execution_file, late_processes[i], "NEW", current_time);
+                late_processes[i] = NULL;
+            }
+        }
+    }
+
+    return any_late_process;
+}
+
 
 void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time){
     if (*processes_waiting > 0){
             for (int i = 0; i < 15; i++){
                 if (waiting_array[i] != NULL){
                     Process *process = waiting_array[i]; 
-                    process->current_IO_time--;
-                    if (process->current_IO_time == 0){
+                    process->current_state_time--;
+                    if (process->current_state_time == 0){
                         enqueue(ready_queue, process);
                         printf("ENQUEUE size of queue: %d\n", ready_queue->size );
                         display_ready_queue(ready_queue);
-                        process->current_IO_time = process->IO_duration;
+                        process->current_state_time = process->IO_duration;
                         waiting_array[i] = NULL; // clear position in array
                         (*processes_waiting)--;
                         printf("Process %d goes to ready, processes waiting: %d\n", process->pid, *processes_waiting);
@@ -315,8 +422,9 @@ int main(int argc, char *argv[]){
     //parses input file and creates and array of processes
     Process **processes = get_processes("input_data_101287292_101244907.txt", memory_file, execution_file, partitions_array, &current_time, &usable_memory);
 
-
-    Queue *ready_queue = create_queue(processes);
+    //processes which arrive later
+    Process *late_processes[15] = {NULL};
+    Queue *ready_queue = create_queue(processes, late_processes);
 
 
     //get number of processes we will need to handle before temrinating 
@@ -340,11 +448,13 @@ int main(int argc, char *argv[]){
 
     Process* running_process = NULL;
     int next_IO;
+    bool any_late_process = true;
+    bool ready_to_run_state ; //to ensure we don't service at the same time we init it
     while (total_num_processes > 0){
         
         if (current_time % 10 == 0 ) {
             printf("At time: %d\n", current_time);
-            //display_ready_queue(ready_queue); 
+            display_ready_queue(ready_queue); 
         }
         
         if (running_process == NULL){
@@ -354,51 +464,56 @@ int main(int argc, char *argv[]){
                 printf("Process %d is running\n", running_process->pid);
                 ready_to_running(execution_file, running_process, current_time);
                 next_IO = running_process->IO_frequency;
+                ready_to_run_state = true;
+
 
             } else { // no elements in ready queue keep incrementing time
                 service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+                if (any_late_process){
+                    any_late_process = load_late_processes(execution_file, ready_queue, late_processes, current_time);
+                }
                 current_time++;
                 continue;
             } 
-
-            if (current_time == 0){
-                current_time++;
-                continue;
-            }
         }
 
+        if (any_late_process){
+            any_late_process = load_late_processes(execution_file, ready_queue, late_processes, current_time);
+        }
 
-        running_process->cpu_time--;
-        next_IO--;
-        service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
-        if (running_process->cpu_time == 0){
-            printf("Process %d terminates\n", running_process->pid);
-            running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
-            running_process = NULL;
-            total_num_processes--;
-            if (ready_queue->size > 0 ){
-                running_process = dequeue(ready_queue);
-                printf("Process %d is running\n", running_process->pid);
-                ready_to_running(execution_file, running_process, current_time);
-                next_IO = running_process->IO_frequency;
-            }
-
-           
-        } else if (next_IO == 0){
-            printf("Process %d goes to waiting, processes waiting: %d\n", running_process->pid, processes_waiting + 1);
-            running_to_waiting(execution_file, running_process, current_time);
-            waiting_array[processes_waiting] = running_process;
-            processes_waiting++;
-            running_process = NULL;
-            if (ready_queue->size > 0 ){
-                running_process = dequeue(ready_queue);
-                printf("Process %d is running\n", running_process->pid);
-                ready_to_running(execution_file, running_process, current_time);
-                next_IO = running_process->IO_frequency;
-            }
-
-        } 
+        if (!ready_to_run_state){
+            running_process->cpu_time--;
+            next_IO--;
+            service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+            if (running_process->cpu_time == 0){
+                printf("Process %d terminates\n", running_process->pid);
+                running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
+                running_process = NULL;
+                total_num_processes--;
+                if (ready_queue->size > 0 ){
+                    running_process = dequeue(ready_queue);
+                    printf("Process %d is running\n", running_process->pid);
+                    ready_to_running(execution_file, running_process, current_time);
+                    next_IO = running_process->IO_frequency;
+                }
             
+            } else if (next_IO == 0){
+                printf("Process %d goes to waiting, processes waiting: %d\n", running_process->pid, processes_waiting + 1);
+                running_to_waiting(execution_file, running_process, current_time);
+                waiting_array[processes_waiting] = running_process;
+                processes_waiting++;
+                running_process = NULL;
+                if (ready_queue->size > 0 ){
+                    running_process = dequeue(ready_queue);
+                    printf("Process %d is running\n", running_process->pid);
+                    ready_to_running(execution_file, running_process, current_time);
+                    next_IO = running_process->IO_frequency;
+                }
+
+            } 
+        }
+
+        ready_to_run_state = false;
         current_time++;
 
     }

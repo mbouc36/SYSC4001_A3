@@ -24,7 +24,7 @@ typedef struct Process
     int cpu_time;
     int IO_frequency;
     int IO_duration;
-    int current_IO_time;
+    int current_state_time; //this is used to measure the time the process is currently in
     int partition_index;
     struct Process* next;
 
@@ -75,7 +75,7 @@ void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *pro
 //this creates the array from the input file and creates an array of processes 
 Process** get_processes(const char *path, FILE *memory_file, FILE *execution_file, Partition* partitions_array[6], int* current_time, int* usable_memory);
 
-Queue* create_queue(Process ** processes);
+Queue* create_queue(Process ** processes, Process *late_processes[15]);
 
 Process* dequeue(Queue *ready_queue);
 
@@ -83,5 +83,8 @@ void display_ready_queue(Queue *ready_queue);
 
 //service processes that are currently waiting
 void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time);
+
+//this function returns false when there is no more late processes to load
+bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late_processes[15], int current_time);
 
 #endif
