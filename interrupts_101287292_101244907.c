@@ -7,6 +7,10 @@
 #include <unistd.h>
 #include "interrupts_101287292_101244907.h"
 
+#define FCFS 0
+#define EP 1
+#define RR 2
+
 
 // function to create partiotine node 
 Partition* create_partition( int number,  int size){
@@ -90,7 +94,6 @@ Queue* create_queue(Process** processes, Process *late_processes[15]){
                 }
                 
             }
-            printf("Loaded process: %d\n", processes[i]->pid);
             q->size++;
         } else {
             late_processes[i] = processes[i];
@@ -103,7 +106,7 @@ Queue* create_queue(Process** processes, Process *late_processes[15]){
     return q;
 }
 
-
+//FOR EP when adding to queue we need to know the value of the current process to know if we should preept it
 void enqueue(Queue *ready_queue, Process* process){
     process->next = NULL;
     
@@ -331,6 +334,12 @@ void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *pro
     update_memory_status(memory_file, partitions_array, current_time, process->size, usable_memory, false);
 }
 
+//state chnage from RUNNING->READY when preempted
+void running_to_ready(FILE *execution_file, Process *process, int current_time){
+    strcpy(process->state, "READY");
+    update_execution(execution_file, process, "RUNNING", current_time); 
+}
+
 //this function returns false when there is no more late processes to load
 bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late_processes[15], int current_time){
     bool any_late_process = false;
@@ -340,7 +349,6 @@ bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late
                 any_late_process = true;
                 late_processes[i]->current_state_time--;
             } else {
-                printf("Loaded late process: %d\n", late_processes[i]->pid);
                 enqueue(ready_queue, late_processes[i]);
                 late_processes[i]->current_state_time = late_processes[i]->IO_duration;
                 strcpy(late_processes[i]->state, "READY");
@@ -362,12 +370,9 @@ void service_waiting(FILE *execution_file, Process *waiting_array[15], int *proc
                     process->current_state_time--;
                     if (process->current_state_time == 0){
                         enqueue(ready_queue, process);
-                        printf("ENQUEUE size of queue: %d\n", ready_queue->size );
-                        display_ready_queue(ready_queue);
                         process->current_state_time = process->IO_duration;
                         waiting_array[i] = NULL; // clear position in array
                         (*processes_waiting)--;
-                        printf("Process %d goes to ready, processes waiting: %d\n", process->pid, *processes_waiting);
                         waiting_to_ready(execution_file, process, current_time);
                         //shift down array elements
                         for (int j = i; j < 14; j++){
@@ -404,6 +409,7 @@ int main(int argc, char *argv[]){
     //Setup varibles used for parsing files
     int current_time = 0;
     int usable_memory = 100;
+    int scheduler = RR;
 
 
     //Let's prepare the output files
@@ -435,8 +441,6 @@ int main(int argc, char *argv[]){
         }
     }
 
-    printf("the total num of processes: %d\n", total_num_processes);
-
     // prpccesses in waiting
     Process *waiting_array[15] = {NULL};
     int processes_waiting = 0;
@@ -450,16 +454,12 @@ int main(int argc, char *argv[]){
     int next_IO;
     bool any_late_process = true;
     bool no_process_running; //to ensure we don't service at the same time we init it
+    int quantum;
     while (total_num_processes > 0){
         
-        if (current_time % 10 == 0 ) {
-            printf("At time: %d\n", current_time);
-            display_ready_queue(ready_queue); 
-        }
-        
-        
+
         if (running_process == NULL){
-            //queue is empty but could fill if we service waiting
+            //queue is empty but could fill if a process is finished with IO
             if (ready_queue->size == 0){
                 service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
 
@@ -468,9 +468,9 @@ int main(int argc, char *argv[]){
             //get new running process based on queue
             if (ready_queue->size > 0 ){
                 running_process = dequeue(ready_queue);
-                printf("Process %d is running\n", running_process->pid);
                 ready_to_running(execution_file, running_process, current_time);
                 next_IO = running_process->IO_frequency;
+                quantum = 100;
                 
             } 
 
@@ -485,32 +485,48 @@ int main(int argc, char *argv[]){
         if (!no_process_running){
             running_process->cpu_time--;
             next_IO--;
+            quantum--;
             service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
             if (next_IO == 0){
-                printf("Process %d goes to waiting, processes waiting: %d\n", running_process->pid, processes_waiting + 1);
                 running_to_waiting(execution_file, running_process, current_time);
                 waiting_array[processes_waiting] = running_process;
                 processes_waiting++;
                 running_process = NULL;
+                
 
 
             } else if (running_process->cpu_time <= 0){
-                printf("Process %d terminates\n", running_process->pid);
-                running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
+                running_to_terminated(execution_file, memory_file, running_process, partitions_array,current_time, &usable_memory);
                 running_process = NULL;
                 total_num_processes--;            
-            }    
-            
-            if (ready_queue->size > 0 && running_process == NULL){
-                running_process = dequeue(ready_queue);
-                printf("Process %d is running\n", running_process->pid);
-                ready_to_running(execution_file, running_process, current_time);
-                next_IO = running_process->IO_frequency;
+            } else if (scheduler == RR && quantum == 0){
+                running_to_ready(execution_file, running_process, current_time);
+                enqueue(ready_queue, running_process);
+                printf("Running process finishes it's quantum\n");
+                running_process = NULL;
+            }
+
+            if (ready_queue->size > 0 ){
+                //should we preempt
+                if (scheduler == EP && running_process != NULL &&  ready_queue->head->pid < running_process->pid){
+                    running_to_ready(execution_file, running_process, current_time);
+                    enqueue(ready_queue, running_process);
+                    printf("Process with pid: %d preempted running process with pid: %d\n", ready_queue->head->pid, running_process->pid);
+                    running_process = NULL;
+
+                }
+                
+                if (running_process == NULL){
+                    running_process = dequeue(ready_queue);
+                    ready_to_running(execution_file, running_process, current_time);
+                    next_IO = running_process->IO_frequency;
+                    quantum = 100;
+                }
             }
         }
 
-       no_process_running= false;
-        current_time++;
+       no_process_running = false;
+       current_time++;
 
     }
 
@@ -545,14 +561,3 @@ int main(int argc, char *argv[]){
 
 }
 
-
-/*
-
-
-ready queue, waiting array
-
-loop that represents time and hanlde all state changes
-
-
-
-*/

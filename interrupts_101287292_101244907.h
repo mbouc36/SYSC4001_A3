@@ -79,7 +79,12 @@ Queue* create_queue(Process ** processes, Process *late_processes[15]);
 
 Process* dequeue(Queue *ready_queue);
 
+void enqueue(Queue *ready_queue, Process* process);
+
 void display_ready_queue(Queue *ready_queue);
+
+//state chnage from RUNNING->READY when preempted
+void running_to_ready(FILE *execution_file, Process *process, int current_time);
 
 //service processes that are currently waiting
 void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time);
