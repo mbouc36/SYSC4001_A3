@@ -449,7 +449,7 @@ int main(int argc, char *argv[]){
     Process* running_process = NULL;
     int next_IO;
     bool any_late_process = true;
-    bool ready_to_run_state ; //to ensure we don't service at the same time we init it
+    bool no_process_running; //to ensure we don't service at the same time we init it
     while (total_num_processes > 0){
         
         if (current_time % 10 == 0 ) {
@@ -457,63 +457,59 @@ int main(int argc, char *argv[]){
             display_ready_queue(ready_queue); 
         }
         
+        
         if (running_process == NULL){
+            //queue is empty but could fill if we service waiting
+            if (ready_queue->size == 0){
+                service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+
+            } 
+
+            //get new running process based on queue
             if (ready_queue->size > 0 ){
                 running_process = dequeue(ready_queue);
-                printf("DEQUEUE size of queue: %d\n", ready_queue->size );
                 printf("Process %d is running\n", running_process->pid);
                 ready_to_running(execution_file, running_process, current_time);
                 next_IO = running_process->IO_frequency;
-                ready_to_run_state = true;
-
-
-            } else { // no elements in ready queue keep incrementing time
-                service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
-                if (any_late_process){
-                    any_late_process = load_late_processes(execution_file, ready_queue, late_processes, current_time);
-                }
-                current_time++;
-                continue;
+                
             } 
+
+            no_process_running= true;
         }
+        
 
         if (any_late_process){
             any_late_process = load_late_processes(execution_file, ready_queue, late_processes, current_time);
         }
 
-        if (!ready_to_run_state){
+        if (!no_process_running){
             running_process->cpu_time--;
             next_IO--;
             service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
-            if (running_process->cpu_time == 0){
-                printf("Process %d terminates\n", running_process->pid);
-                running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
-                running_process = NULL;
-                total_num_processes--;
-                if (ready_queue->size > 0 ){
-                    running_process = dequeue(ready_queue);
-                    printf("Process %d is running\n", running_process->pid);
-                    ready_to_running(execution_file, running_process, current_time);
-                    next_IO = running_process->IO_frequency;
-                }
-            
-            } else if (next_IO == 0){
+            if (next_IO == 0){
                 printf("Process %d goes to waiting, processes waiting: %d\n", running_process->pid, processes_waiting + 1);
                 running_to_waiting(execution_file, running_process, current_time);
                 waiting_array[processes_waiting] = running_process;
                 processes_waiting++;
                 running_process = NULL;
-                if (ready_queue->size > 0 ){
-                    running_process = dequeue(ready_queue);
-                    printf("Process %d is running\n", running_process->pid);
-                    ready_to_running(execution_file, running_process, current_time);
-                    next_IO = running_process->IO_frequency;
-                }
 
-            } 
+
+            } else if (running_process->cpu_time <= 0){
+                printf("Process %d terminates\n", running_process->pid);
+                running_to_terminated(execution_file, memory_file,running_process, partitions_array,current_time, &usable_memory);
+                running_process = NULL;
+                total_num_processes--;            
+            }    
+            
+            if (ready_queue->size > 0 && running_process == NULL){
+                running_process = dequeue(ready_queue);
+                printf("Process %d is running\n", running_process->pid);
+                ready_to_running(execution_file, running_process, current_time);
+                next_IO = running_process->IO_frequency;
+            }
         }
 
-        ready_to_run_state = false;
+       no_process_running= false;
         current_time++;
 
     }

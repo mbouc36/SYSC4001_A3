@@ -33,23 +33,32 @@
 |                 117| 12 |  WAITING  | READY     |
 |                 137| 1  |  RUNNING  | WAITING   |
 |                 137| 12 |  READY    | RUNNING   |
-|                 147| 12 |  RUNNING  | TERMINATED|
+|                 147| 12 |  RUNNING  | WAITING   |
 |                 147| 15 |  READY    | RUNNING   |
 |                 150| 15 |  RUNNING  | TERMINATED|
 |                 150| 2  |  READY    | RUNNING   |
+|                 152| 12 |  WAITING  | READY     |
 |                 160| 2  |  RUNNING  | WAITING   |
-|                 160| 3  |  READY    | RUNNING   |
+|                 160| 12 |  READY    | RUNNING   |
+|                 161| 12 |  RUNNING  | TERMINATED|
+|                 161| 3  |  READY    | RUNNING   |
 |                 162| 1  |  WAITING  | READY     |
 |                 162| 2  |  WAITING  | READY     |
-|                 162| 3  |  RUNNING  | WAITING   |
-|                 162| 1  |  READY    | RUNNING   |
-|                 172| 3  |  WAITING  | READY     |
-|                 187| 1  |  RUNNING  | TERMINATED|
-|                 187| 2  |  READY    | RUNNING   |
-|                 197| 2  |  RUNNING  | TERMINATED|
-|                 197| 3  |  READY    | RUNNING   |
-|                 199| 3  |  RUNNING  | WAITING   |
-|                 209| 3  |  WAITING  | READY     |
+|                 163| 3  |  RUNNING  | WAITING   |
+|                 163| 1  |  READY    | RUNNING   |
+|                 173| 3  |  WAITING  | READY     |
+|                 188| 1  |  RUNNING  | WAITING   |
+|                 188| 2  |  READY    | RUNNING   |
+|                 198| 2  |  RUNNING  | WAITING   |
+|                 198| 3  |  READY    | RUNNING   |
+|                 200| 2  |  WAITING  | READY     |
+|                 200| 3  |  RUNNING  | WAITING   |
+|                 200| 2  |  READY    | RUNNING   |
+|                 201| 2  |  RUNNING  | TERMINATED|
+|                 210| 3  |  WAITING  | READY     |
 |                 210| 3  |  READY    | RUNNING   |
 |                 211| 3  |  RUNNING  | TERMINATED|
+|                 213| 1  |  WAITING  | READY     |
+|                 213| 1  |  READY    | RUNNING   |
+|                 214| 1  |  RUNNING  | TERMINATED|
 +--------------------------------------------------+
