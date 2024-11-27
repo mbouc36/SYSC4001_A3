@@ -1,0 +1,11 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/michaelb/Documents/GitHub/SYSC4001_A3/Part2/Part2_A_101287292_101244907'
+relocations:
+  - { offsetInCU: 0xE3, offset: 0xE3, size: 0x8, addend: 0x0, symName: __Z4waiti, symObjAddr: 0x0, symBinAddr: 0x1000037F0, symSize: 0x3C }
+  - { offsetInCU: 0xD7C, offset: 0xD7C, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x78, symBinAddr: 0x100003868, symSize: 0x50C }
+  - { offsetInCU: 0x103D, offset: 0x103D, size: 0x8, addend: 0x0, symName: __Z6signali, symObjAddr: 0x3C, symBinAddr: 0x10000382C, symSize: 0x3C }
+  - { offsetInCU: 0x1045, offset: 0x1045, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x78, symBinAddr: 0x100003868, symSize: 0x50C }
+  - { offsetInCU: 0x1081, offset: 0x1081, size: 0x8, addend: 0x0, symName: __Z4waiti, symObjAddr: 0x0, symBinAddr: 0x1000037F0, symSize: 0x3C }
+  - { offsetInCU: 0x1089, offset: 0x1089, size: 0x8, addend: 0x0, symName: __Z6signali, symObjAddr: 0x3C, symBinAddr: 0x10000382C, symSize: 0x3C }
+...
