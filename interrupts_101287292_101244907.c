@@ -88,7 +88,7 @@ Queue* create_queue(Process** processes, Process *late_processes[15]){
                     
                 }
 
-                if (p == q->head){ //processes is new head
+                if (p->next != processes[i] && p == q->head){ //processes is new head, first conditional checks we havent added it yet
                     processes[i]->next = q->head;
                     q->head = processes[i];
                 }
@@ -149,7 +149,7 @@ void enqueue(Queue *ready_queue, Process* process){
                 ready_queue->tail = process;
                 process->next = NULL;
                 break; 
-            } else if (process->pid >= p->next->pid){
+            } else if (process->arrival_time == p->next->arrival_time && process->pid > p->next->pid){ //buggy here, should be checking activation time too so we don't put something that came first ahead
                 p = p->next;
             } else {
                 process->next = p->next;
@@ -192,6 +192,14 @@ void display_ready_queue(Queue *ready_queue){
     }
 }
 
+void increment_waiting_times(Queue *ready_queue){
+    if(ready_queue->head != NULL){
+        for (Process *process = ready_queue->head; process != NULL; process = process->next){
+            process->waiting_time++;
+        }
+    }
+}
+
 void setup_read_file(FILE **filename, const char *path){
 
     *filename = fopen(path, "r");
@@ -208,12 +216,12 @@ void setup_read_file(FILE **filename, const char *path){
     }
 }
 
-Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_file, Partition* partitions_array[6], int* current_time, int* usable_memory){
+Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_file, Partition* partitions_array[6], int* current_time, int* total_free_memory){
     //Begin memory state table in memory status file
     fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
     fprintf(memory_file, "| Time of Event  | Memory Used |        Partitions State      | Total Free Memory | Usable Free Memory|\n");
     fprintf(memory_file, "+-----------------------------------------------------------------------------------------------------+\n");
-    update_memory_status(memory_file, partitions_array, *current_time, 0, usable_memory, true);
+    update_memory_status(memory_file, partitions_array, *current_time, 0, total_free_memory, true);
 
     //Begin process state table in execution file
     fprintf(execution_file, "+--------------------------------------------------+\n");
@@ -240,19 +248,25 @@ Process** get_processes(const char *path, FILE *memory_file ,FILE *execution_fil
     while (fgets(line, sizeof(line), input_file)){
         //lets get all the variables from the file
         if (sscanf(line, "%d, %d, %d, %d, %d, %d", &PID, &size, &arrival_time, &CPU_time, &IO_frequency, &IO_duration)){
-            //before we create the process we need to find a memeory address
-            best_partition_index = find_partition(size, PID, partitions_array);
+            if (arrival_time == 0){
+                //before we create the process we need to find a memeory address
+                best_partition_index = find_partition(size, PID, partitions_array);
 
-            //Mark the partition with the PID value
-            partitions_array[best_partition_index]->PID = PID;
-            update_memory_status(memory_file, partitions_array, *current_time, size, usable_memory, true);
+                //Mark the partition with the PID value
+                partitions_array[best_partition_index]->PID = PID;
+                update_memory_status(memory_file, partitions_array, *current_time, size, total_free_memory, true);
 
-            //now we create the process
-            process = create_new_process(PID, size, arrival_time, CPU_time, IO_frequency, IO_duration, best_partition_index);
-            if (process->arrival_time == 0){
+                //now we create the process
+                process = create_new_process(PID, size, arrival_time, CPU_time, IO_frequency, IO_duration, best_partition_index);
+            
                 strcpy(process->state, "READY");
                 update_execution(execution_file, process, "NEW", *current_time);
+            } else {
+                best_partition_index = -1;
+                //now we create the process
+                process = create_new_process(PID, size, arrival_time, CPU_time, IO_frequency, IO_duration, best_partition_index);
             }
+
             
             processes[i] = process;
             i++;
@@ -288,24 +302,24 @@ int find_partition(int size, int PID,  Partition* partitions_array[6]){
     return best_partition_index;
 }
 
-void update_memory_status(FILE *memory_file, Partition* partitions_array[6], int current_time, int size_used, int *usable_memory, bool fill_partition){
-    int total_free_memory = 0;
+void update_memory_status(FILE *memory_file, Partition* partitions_array[6], int current_time, int size_used, int *total_free_memory, bool fill_partition){
+    int usable_memory = 0;
 
     for (int i = 0; i < 6; i++){
         if (partitions_array[i]->PID == -1){
-            total_free_memory += partitions_array[i]->size;
+            usable_memory += partitions_array[i]->size;
         } 
     }
 
     if (fill_partition){
-        *usable_memory -= size_used;
+        *total_free_memory -= size_used;
     } else {
-        *usable_memory += size_used;
+        *total_free_memory += size_used;
     }
 
     fprintf(memory_file, "| %-14d | %-11d | %-3d, %-3d, %-3d, %-3d, %-3d, %-3d | %-17d | %-17d |\n", 
-           current_time, fill_partition? size_used: 0, partitions_array[0]->PID, partitions_array[1]->PID, partitions_array[2]->PID, partitions_array[3]->PID,
-            partitions_array[4]->PID, partitions_array[5]->PID, total_free_memory, *usable_memory);
+           current_time, 100 - *total_free_memory, partitions_array[0]->PID, partitions_array[1]->PID, partitions_array[2]->PID, partitions_array[3]->PID,
+            partitions_array[4]->PID, partitions_array[5]->PID, *total_free_memory, usable_memory);
 }
 
 void update_execution(FILE *execution_file, Process *process, char const old_state[20], int current_time){
@@ -327,11 +341,11 @@ void waiting_to_ready(FILE *execution_file, Process *process, int current_time){
     update_execution(execution_file, process, "WAITING", current_time);
 }
 
-void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *process, Partition* partitions_array[6], int current_time, int *usable_memory){
+void running_to_terminated(FILE *execution_file, FILE *memory_file, Process *process, Partition* partitions_array[6], int current_time, int *total_free_memory){
     strcpy(process->state, "TERMINATED");
     update_execution(execution_file, process, "RUNNING", current_time);
     partitions_array[process->partition_index]->PID = -1;
-    update_memory_status(memory_file, partitions_array, current_time, process->size, usable_memory, false);
+    update_memory_status(memory_file, partitions_array, current_time, process->size, total_free_memory, false);
 }
 
 //state chnage from RUNNING->READY when preempted
@@ -341,7 +355,7 @@ void running_to_ready(FILE *execution_file, Process *process, int current_time){
 }
 
 //this function returns false when there is no more late processes to load
-bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late_processes[15], int current_time){
+bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory){
     bool any_late_process = false;
     for (int i = 0; i < 15 ;i++){
         if (late_processes[i] != NULL){        
@@ -351,6 +365,13 @@ bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late
             } else {
                 enqueue(ready_queue, late_processes[i]);
                 late_processes[i]->current_state_time = late_processes[i]->IO_duration;
+                //before we create the process we need to find a memeory address
+                int best_partition_index = find_partition(late_processes[i]->size, late_processes[i]->pid, partitions_array);
+                late_processes[i]->partition_index = best_partition_index;
+
+                //Mark the partition with the PID value
+                partitions_array[best_partition_index]->PID = late_processes[i]->pid;
+                update_memory_status(memory_file, partitions_array, current_time, late_processes[i]->size, total_free_memory, true);
                 strcpy(late_processes[i]->state, "READY");
                 update_execution(execution_file, late_processes[i], "NEW", current_time);
                 late_processes[i] = NULL;
@@ -408,8 +429,18 @@ int main(int argc, char *argv[]){
 
     //Setup varibles used for parsing files
     int current_time = 0;
-    int usable_memory = 100;
+    int total_free_memory = 100;
     int scheduler = RR;
+    // if (strcmp(argv[2], "FCFS") == 0){
+    //     scheduler = FCFS;
+    // } else if (strcmp(argv[2], "EP") == 0){
+    //     scheduler = EP;
+    // } else if (strcmp(argv[2], "RR") == 0){
+    //     scheduler = RR;
+    // } else {
+    //     printf("Can't recognize scheduler, should be FCFS, EP or RR\n");
+    //     exit(1);
+    // }
 
 
     //Let's prepare the output files
@@ -426,7 +457,7 @@ int main(int argc, char *argv[]){
 
     
     //parses input file and creates and array of processes
-    Process **processes = get_processes("input_data_101287292_101244907.txt", memory_file, execution_file, partitions_array, &current_time, &usable_memory);
+    Process **processes = get_processes("input_data_10.txt", memory_file, execution_file, partitions_array, &current_time, &total_free_memory);
 
     //processes which arrive later
     Process *late_processes[15] = {NULL};
@@ -456,8 +487,6 @@ int main(int argc, char *argv[]){
     bool no_process_running; //to ensure we don't service at the same time we init it
     int quantum;
     while (total_num_processes > 0){
-        
-
         if (running_process == NULL){
             //queue is empty but could fill if a process is finished with IO
             if (ready_queue->size == 0){
@@ -473,15 +502,14 @@ int main(int argc, char *argv[]){
                 quantum = 100;
                 
             } 
-
             no_process_running= true;
         }
         
 
         if (any_late_process){
-            any_late_process = load_late_processes(execution_file, ready_queue, late_processes, current_time);
+            any_late_process = load_late_processes(execution_file, memory_file, partitions_array, ready_queue, late_processes, current_time, &total_free_memory);
         }
-
+        increment_waiting_times(ready_queue);
         if (!no_process_running){
             running_process->cpu_time--;
             next_IO--;
@@ -492,11 +520,10 @@ int main(int argc, char *argv[]){
                 waiting_array[processes_waiting] = running_process;
                 processes_waiting++;
                 running_process = NULL;
-                
-
-
+            
             } else if (running_process->cpu_time <= 0){
-                running_to_terminated(execution_file, memory_file, running_process, partitions_array,current_time, &usable_memory);
+                running_to_terminated(execution_file, memory_file, running_process, partitions_array,current_time, &total_free_memory);
+                running_process->current_state_time = current_time; //used for finding mean turn around time
                 running_process = NULL;
                 total_num_processes--;            
             } else if (scheduler == RR && quantum == 0){
@@ -511,7 +538,6 @@ int main(int argc, char *argv[]){
                 if (scheduler == EP && running_process != NULL &&  ready_queue->head->pid < running_process->pid){
                     running_to_ready(execution_file, running_process, current_time);
                     enqueue(ready_queue, running_process);
-                    printf("Process with pid: %d preempted running process with pid: %d\n", ready_queue->head->pid, running_process->pid);
                     running_process = NULL;
 
                 }
@@ -546,6 +572,20 @@ int main(int argc, char *argv[]){
         }
     }
 
+    //print mean waiting time
+    int total_waiting_time = 0;
+    int total_turnaround_time = 0;
+    for (int i =0; i < 15; i++){
+        if (processes[i] != NULL ){
+            total_num_processes++;
+            total_waiting_time += processes[i]->waiting_time;
+            total_turnaround_time += processes[i]->current_state_time - processes[i]->arrival_time;            
+        }
+
+    }
+    printf("Throughput: %.2f\n", (float) (current_time - 1)/total_num_processes);
+    printf("Mean Turn around Time: %.2f\n", (float) total_turnaround_time/total_num_processes);
+    printf("Average waiting time: %.2f\n", (float) total_waiting_time/total_num_processes);
     if (processes) {
         for (int i = 0; processes[i] != NULL; i++) {
             free(processes[i]); 
@@ -561,3 +601,6 @@ int main(int argc, char *argv[]){
 
 }
 
+//Throughput = Number of Processes / Total Time
+// avg wait time time in ready queue
+// TAT = Completion Time - Arrival Time

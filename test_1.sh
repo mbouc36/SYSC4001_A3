@@ -2,5 +2,5 @@ rm -f interrupts_101287292_101244907
 
 gcc -g -Wall interrupts_101287292_101244907.c -o interrupts_101287292_101244907
 
-./interrupts_101287292_101244907 input_data_101287292_101244907.txt execution_101287292_101244907.txt --debug
+./interrupts_101287292_101244907 input_data_1.txt RR
 

@@ -26,6 +26,7 @@ typedef struct Process
     int IO_duration;
     int current_state_time; //this is used to measure the time the process is currently in
     int partition_index;
+    int waiting_time;
     struct Process* next;
 
 }Process;
@@ -90,6 +91,8 @@ void running_to_ready(FILE *execution_file, Process *process, int current_time);
 void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time);
 
 //this function returns false when there is no more late processes to load
-bool load_late_processes(FILE *execution_file, Queue *ready_queue, Process *late_processes[15], int current_time);
+bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory);
+
+void increment_waiting_times(Queue *ready_queue);
 
 #endif
