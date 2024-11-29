@@ -30,7 +30,7 @@ void read_data_file(){
     FILE *student_data;
     int count =0; // to trach total num of students
 
-    student_data = fopen("class_list_of_students_copy.txt", "r");
+    student_data = fopen("class_list_of_students.txt", "r");
     if (student_data == NULL){
         printf("Can't Open\n");
         return ;
