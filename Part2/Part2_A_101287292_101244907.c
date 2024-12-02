@@ -20,6 +20,15 @@ void signal(int semid){ //similar to wait
     semop(semid, &sb, 1);
 }
 
+int get_semaphore_value(int semid){
+    int sem_value = semctl(semid, 0, GETVAL);
+    if (sem_value == -1) { // check for error
+        perror("semctl GETVAL");
+        exit(1);
+    }
+    return sem_value;
+}
+
 
 int main(void){
 
@@ -90,6 +99,7 @@ int main(void){
 
     int semaphores[] = {sem_1, sem_2, sem_3, sem_4, sem_5}; 
 
+
     for (int i = 0; i < 5; i++){
         if ((pids[i] = fork()) == 0){
             int pid = getpid();
@@ -97,7 +107,8 @@ int main(void){
             int current_student;
             for (int j = 0; j < 20; j++){
                 wait(semaphores[i]);
-
+                wait(semaphores[i % 5]);
+                
                 //fetch current student
                 printf("I am TA %d and I am accessing the database\n", i + 1);
                 current_student = students[j];
@@ -116,16 +127,21 @@ int main(void){
                         if (i == 4){
                             signal(sem_parent);
                         }
-                        signal(semaphores[i + 1]);
+
+                        if (i % 2 == 0 ){ 
+                            signal(sem_1);
+                        } else {
+                            signal(sem_2);
+                        }
                         printf("I am process %d, and I am exiting\n", i + 1);
                         exit(0);
                     }
                 } 
                 
-                if (i == 4){ 
-                    signal(semaphores[0]);
+                if (i % 2 == 0 ){ 
+                    signal(sem_1);
                 } else {
-                    signal(semaphores[i + 1]);
+                    signal(sem_2);
                 }
 
             }

@@ -430,17 +430,17 @@ int main(int argc, char *argv[]){
     //Setup varibles used for parsing files
     int current_time = 0;
     int total_free_memory = 100;
-    int scheduler = RR;
-    // if (strcmp(argv[2], "FCFS") == 0){
-    //     scheduler = FCFS;
-    // } else if (strcmp(argv[2], "EP") == 0){
-    //     scheduler = EP;
-    // } else if (strcmp(argv[2], "RR") == 0){
-    //     scheduler = RR;
-    // } else {
-    //     printf("Can't recognize scheduler, should be FCFS, EP or RR\n");
-    //     exit(1);
-    // }
+    int scheduler;
+    if (strcmp(argv[2], "FCFS") == 0){
+        scheduler = FCFS;
+    } else if (strcmp(argv[2], "EP") == 0){
+        scheduler = EP;
+    } else if (strcmp(argv[2], "RR") == 0){
+        scheduler = RR;
+    } else {
+        printf("Can't recognize scheduler, should be FCFS, EP or RR\n");
+        exit(1);
+    }
 
 
     //Let's prepare the output files
@@ -457,7 +457,7 @@ int main(int argc, char *argv[]){
 
     
     //parses input file and creates and array of processes
-    Process **processes = get_processes("input_data_10.txt", memory_file, execution_file, partitions_array, &current_time, &total_free_memory);
+    Process **processes = get_processes(argv[1], memory_file, execution_file, partitions_array, &current_time, &total_free_memory);
 
     //processes which arrive later
     Process *late_processes[15] = {NULL};

@@ -8,6 +8,12 @@
 #include <unistd.h>
 #include <time.h>
 
+typedef struct SharedMemory
+{
+    int students[20]; 
+    int num_terminated;
+}SharedMemory;
+
 
 //semaphore operations
 void wait(int semid){ //semid is id for synchronization
@@ -20,6 +26,15 @@ void signal(int semid){ //similar to wait
     semop(semid, &sb, 1);
 }
 
+int get_semaphore_value(int semid){
+    int sem_value = semctl(semid, 0, GETVAL);
+    if (sem_value == -1) { // check for error
+        perror("semctl GETVAL");
+        exit(1);
+    }
+    return sem_value;
+}
+
 
 int main(void){
 
@@ -28,25 +43,31 @@ int main(void){
     //semaphores
     int sem_1 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
     int sem_2 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
-    int sem_3 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
-    int sem_4 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
-    int sem_5 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
+    int shared_sem = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
+    // int sem_4 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
+    // int sem_5 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
     int sem_parent = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
 
 
 
     //init semaphores
     semctl(sem_1, 0, SETVAL, 1);  //init sempahore to 1 (available)
-    semctl(sem_2, 0, SETVAL, 0);
-    semctl(sem_3, 0, SETVAL, 0);
-    semctl(sem_4, 0, SETVAL, 0);
-    semctl(sem_5, 0, SETVAL, 0);
+    semctl(sem_2, 0, SETVAL, 1);
+    semctl(shared_sem, 0, SETVAL, 1);
+    // semctl(sem_4, 0, SETVAL, 0);
+    // semctl(sem_5, 0, SETVAL, 0);
     semctl(sem_parent, 0, SETVAL, 0);
 
     //shared memory
     key_t key = ftok("shmfile", 65); // generates unique queue for shared memeory
     int shmid = shmget(key, 20 * sizeof(int), 0666 | IPC_CREAT); // allocates a shared memory segment or accesses it if already created
-    int *students  = (int*)shmat(shmid, NULL, 0);
+    SharedMemory *shm = (SharedMemory *)shmat(shmid, NULL, 0);
+    if (shm == (SharedMemory *)-1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    shm->num_terminated = 0;
 
     //place students from input file into array
     FILE *student_file = fopen("student_database.txt", "r");
@@ -67,7 +88,7 @@ int main(void){
     char line[256];
     while (fgets(line, sizeof(line), student_file)){
         if (sscanf(line, "%d", &student_num)){
-            students[index] = student_num;
+            shm->students[index] = student_num;
             index++;
         }
     }
@@ -88,12 +109,12 @@ int main(void){
     }
 
 
-
     //create 5 TAs
     pid_t pids[5];
 
+    //int semaphores[] = {sem_1, sem_2, sem_3, sem_4, sem_5}; 
 
-    int semaphores[] = {sem_1, sem_2, sem_3, sem_4, sem_5}; 
+    // Disable buffering for stdout
 
     for (int i = 0; i < 5; i++){
         if ((pids[i] = fork()) == 0){
@@ -101,11 +122,18 @@ int main(void){
             int num_times_ran = 0;
             int current_student;
             for (int j = 0; j < 20; j++){
-                wait(semaphores[i]);
-
+                //when i == 0, 2, 4
+                if (i % 2 == 0 ){
+                    wait(sem_1);
+                } else {
+                    wait(sem_2);
+                }
+                
                 //fetch current student
                 printf("I am TA %d and I am accessing the database\n", i + 1);
-                current_student = students[j];
+                wait(shared_sem);
+                current_student = shm->students[j];
+                signal(shared_sem);
                 //sleep(rand() % 3 + 1);
 
                 //pass grade to output file 
@@ -113,24 +141,35 @@ int main(void){
                 fprintf(output_files[i], "%d, %d\n", current_student, rand() % 10 + 1);
                 //sleep( rand() % 10 + 1);
 
+                fflush(stdout);
+
                 //we've reached the end of the list, check if finished
                 if (j == 19){
                     j = -1; // reset j
                     num_times_ran++;
                     if (num_times_ran == 3){
-                        if (i == 4){
+                        wait(shared_sem);
+                        shm->num_terminated++;
+                        if (5 == shm->num_terminated){
                             signal(sem_parent);
-                        } else {
-                            signal(semaphores[i + 1]);
                         }
-                        
+                        signal(shared_sem);
+
+                        if (i % 2 == 0 ){ 
+                            signal(sem_1);
+                        } else {
+                            signal(sem_2);
+                        }
                         printf("I am process %d, and I am exiting\n", i + 1);
                         exit(0);
                     }
                 } 
-
-                signal(semaphores[i % 5]);
                 
+                if (i % 2 == 0 ){ 
+                    signal(sem_1);
+                } else {
+                    signal(sem_2);
+                }
 
             }
 
@@ -140,11 +179,12 @@ int main(void){
     wait(sem_parent);
 
     //detach shared memory
-    if (shmdt(students) == -1) {
+    if (shmdt(shm) == -1) {
         perror("shmdt");
         exit(1);
     }
     shmctl(shmid, IPC_RMID, NULL);
+
 
     return 0;
 }
