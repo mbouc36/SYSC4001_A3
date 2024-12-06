@@ -5,21 +5,23 @@
 #include <unistd.h> 
 #include <time.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
-#define MAX_STUDENTS 12
-#define TA_NUM 2
+#define MAX_STUDENTS 20
+#define TA_NUM 5
 #define MAX_NUM_ITERATIONS 3
 
 int student_list[MAX_STUDENTS];
 char buffer[250];
 int count = 0; // track total num of students 
-int student_id;
+int marked_students[MAX_STUDENTS] = {0};
+//int student_id;
+int student_index = 0;
 
-
-pthread_t TA_threads[TA_NUM]; // threads for each TA
+pthread_mutex_t student_index_mutex;
 int TA_ids[TA_NUM]; // ids for each TA
-sem_t semaphores[TA_NUM]; // array for 5 TAs 
-
+int sem_id;
 
 // read from the data file 
 void read_data_file(){
@@ -46,95 +48,143 @@ void read_data_file(){
     fclose(student_data);
 }
 
+// function fr sempahore to wait (P)
+int semaphore_wait(int semid, int sem_num){
+    struct sembuf sem_op = {sem_num, -1,0}; 
 
-// TA to mark a student
-void *TA_marking(void *arg){
-    int id = *((int*)arg); // get the TA id 
-
-    printf("The TA %d is ready to mark\n", id); 
-
-    int iterations =0;
-    int student_index = 0;// to access the student list
-    FILE *marked_students; 
-
-    int current_lock = (id-1);
-    int next_lock = (id)%TA_NUM;
-    
-    // mariking the list 3 times
-    while(iterations<MAX_NUM_ITERATIONS){
-
-        sem_wait(&semaphores[current_lock]); // lock for current TA - want id o to access semaphore[0] = the first TA
-        sem_wait(&semaphores[next_lock]); // lock for the next TA
-
-        student_id = student_list[student_index]; // acess the next student 
-        student_index = (student_index+1) % MAX_STUDENTS;// moves to next 
-
-        if (student_id == 0012){
-            student_index = 0; // reset and start over the marking
-        }
-
-        int wait_time = rand() % 4+1;
-        printf("TA %d is accessing database for student %d\n", id, student_id);
-        sleep(wait_time);
-
-        //marking the student 
-        char filename[10];
-        sprintf(filename, "TA%d.txt", id);
-        marked_students = fopen(filename,"a");
-        if (marked_students == NULL){
-           perror("Can't opne file");
-           exit(1);
-        }
-
-        int mark = rand() % 10 +1;
-        printf("TA %d marking student %d with mark %d\n", id, student_id, mark);
-        fprintf(marked_students, "Student: %d, Mark: %d\n", student_id, mark);
-        fclose(marked_students); 
-
-        // release semaphores
-        sem_post(&semaphores[current_lock]);
-        sem_post(&semaphores[next_lock]);
-
-        int access_time = rand() % 4+1; // random val 1-4
-        sleep(access_time); // simulate acessing the database and marking
+    if (semop(semid, &sem_op, 1)==-1){
+        printf("Error, semop failed\n");
+        exit(1);
+    }
+    return 0;
+}
 
 
-        if (student_index ==0){
-            iterations++;
-        }
+// function for sempahore to sgnal (V)
+int semaphore_signal(int semid, int sem_num){
+    struct sembuf sem_op = {sem_num, 1,0}; 
+
+    if (semop(semid, &sem_op,1)== -1){
+        printf("Error, semop failed\n");
+        exit(0);
+    }
+    return 0;
+}
+
+//initialize the semaphores 
+void semaphore_init(){
+
+    //create semaphore 
+    sem_id =  semget(IPC_PRIVATE,TA_NUM,IPC_CREAT|0666);
+    if (sem_id == -1){
+        printf("semget failed\n");
+        exit(1);
+    }
+    // now initialize the semaphores , // 5 processes cocurrently therefore 5 semaphores 
+      
+    for (int i =0; i<TA_NUM;i++){ 
+        semctl(sem_id, i, SETVAL,1);
     }
 }
+
+
+// TA to mark a student
+void TA_marking(int TA_id){
+    int iterations = 0; // Initialize iteration counter
+    FILE *marked_students_file;
+    char filename[30];
+    sprintf(filename, "TA%d.txt", TA_id + 1); // Precompute the filename once
+
+    int current_lock = TA_id;
+    int next_lock = (TA_id + 1) % TA_NUM;
+
+    printf("The TA %d is ready to mark\n", TA_id);
+
+    while (iterations < MAX_NUM_ITERATIONS) {
+        // Always acquire semaphores in increasing order
+        int first_lock = (current_lock < next_lock) ? current_lock : next_lock;
+        int second_lock = (current_lock < next_lock) ? next_lock : current_lock;
+
+        // Acquire locks on semaphores for the current and next TAs
+        semaphore_wait(sem_id, first_lock);
+        printf("TA %d locked semaphore %d (first lock)\n", TA_id, first_lock);
+        semaphore_wait(sem_id, second_lock);
+        printf("TA %d locked semaphore %d (second lock)\n", TA_id, second_lock);
+
+        int local_student_id = -1;
+
+        // Access the shared database (critical section)
+        pthread_mutex_lock(&student_index_mutex);
+
+        if (student_index < MAX_STUDENTS && student_list[student_index] != 9999) {
+            local_student_id = student_list[student_index];
+            marked_students[student_index] = 1; // Mark the student as picked
+            student_index++; // Move to the next student
+        }
+
+        pthread_mutex_unlock(&student_index_mutex);
+
+        // Release semaphores to allow other TAs to access the database
+        semaphore_signal(sem_id, first_lock);
+        printf("TA %d unlocked semaphore %d (first lock)\n", TA_id, first_lock);
+        semaphore_signal(sem_id, second_lock);
+        printf("TA %d unlocked semaphore %d (second lock)\n", TA_id, second_lock);
+
+        if (local_student_id == -1) {
+            printf("TA %d reached the end of the student list.\n", TA_id);
+            break; // End marking for this TA
+        }
+
+        // Mark the student
+        marked_students_file = fopen(filename, "a");
+        if (marked_students_file == NULL) {
+            perror("Error opening file");
+            continue; // Skip this iteration and try again
+        }
+
+        int mark = rand() % 10 + 1; // Random mark between 1 and 10
+        fprintf(marked_students_file, "Student: %d, Mark: %d\n", local_student_id, mark);
+        fclose(marked_students_file);
+
+        printf("TA %d marked student %d with mark %d\n", TA_id, local_student_id, mark);
+
+        // Simulate marking delay
+        sleep(rand() % 10 + 1);
+
+        // Increment iteration count
+        iterations++;
+    }
+    printf("TA %d completed marking after %d iterations.\n", TA_id, iterations);
+}
+
 
 // the plan - 
 int main (){
 
+    semaphore_init();
+
     read_data_file();  
-    // part 1 - a
+    
+    pthread_mutex_init(&student_index_mutex, NULL);
 
-    // initialize the semaphore
+    //initialized all TA ids
     for (int i = 0; i<TA_NUM;i++){
-        sem_init(&semaphores[i],0,1);
+        //printf("begining\n");
+        pid_t pid = fork();
+        if(pid == 0){
+            // child process TA
+            TA_marking(i);
+            //printf("TA %d is done\n",i);
+            exit(EXIT_SUCCESS); 
+        }
     }
 
- 
-    // start threads for TA
-    for (int i = 0; i< TA_NUM;i++){
-        pthread_create(&TA_threads[i],NULL, TA_marking, (void*)&TA_ids[i]);
+    for (int i = 0; i<TA_NUM; i++){
+        wait(NULL); 
     }
-
-    //wait for all threads to be done 
-    for(int i =0; i<TA_NUM;i++){
-        pthread_join(TA_threads[i],NULL);
-    }
-
-    //destroy semaphores
-    for(int i = 0; i< TA_NUM; i++){
-        sem_destroy(&semaphores[i]);
-    }
-   
+    semctl(sem_id, 0, IPC_RMID,0);
+    pthread_mutex_destroy(&student_index_mutex);
 
     printf("****Completed****\n");
-    
-
     return 0;  
 }

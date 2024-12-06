@@ -21,17 +21,15 @@ int sem_id, shem_id, limit_access_id;
 struct Student{
     int id;
     int mark;
+    int mark_count; // track how many times a student being marked 
 };
 // Define the shared memory structure
 struct SharedMemory {
     struct Student students[STUDENTS_NUM];
-    int mark_counter;
+    int mark_counter;// index of the student being marked 
 };
 struct SharedMemory *shared_mem;
 
-//struct Student * students;
-// int *mark_counter; // to keep 
-//int mark_counter;
 
 // read from the data file 
 void read_data_file(){
@@ -52,6 +50,7 @@ void read_data_file(){
             if ((strlen(token)== 4) && (strspn(token,"0123456789")== 4)){ // make sure only tae 4 digits and each token consist of only numbers 
                 shared_mem->students[count].id = atoi(token);
                 shared_mem->students[count].mark = -1; // Initialize marks to -1
+                //shared_mem->students[count].mark_count = 0;
                 count++;
             }
             token = strtok(NULL,", \n"); // move to the next 
@@ -59,8 +58,6 @@ void read_data_file(){
     }
     fclose(student_data);
 }
-
-
 
 // function fr sempahore to wait (P)
 int semaphore_wait(int semid, int sem_num){
@@ -118,7 +115,7 @@ void semaphore_init(){
 // create shared memory and attach it 
 
 void create_shared_memory(){
-    shem_id = shmget(IPC_PRIVATE,sizeof(STUDENTS_NUM),IPC_CREAT|0666 );
+    shem_id = shmget(IPC_PRIVATE,sizeof(struct SharedMemory),IPC_CREAT|0666 );
     if (shem_id == -1){
         perror("shmget failed");
         exit(1); 
@@ -133,51 +130,38 @@ void create_shared_memory(){
     shared_mem->mark_counter = 0; // Initialize mark_counter to 0
 
 }
-
-// function to load the students to a shared memory
-
-/*ta marking function : have 5 TAs, access the database, picks up the next number and save it in a local var
-and wiats between 1 and 4 secs at random, it then releases the semaphores for other TAs, last number is 9999 and 
-should do this 3 times  */ 
-
 // TA marking 
 
-void TA_marking(int TA_id){
+void TA_marking(int id){
+    int TA_id = id;
+    int marking_times = 0;
 
-    for (int marking_times = 0; marking_times < Max_Mark_Time; marking_times++) {
-        while (1) {
+    while(marking_times < Max_Mark_Time) {
             // Concurrency control
-            semaphore_wait(limit_access_id, 0);
+        semaphore_wait(limit_access_id, 0);
+     // Lock the current TA's semaphore and the next one
+        semaphore_wait(sem_id, TA_id);
+        semaphore_wait(sem_id, (TA_id + 1) % TA_NUM);
+     // Access shared memory
+        int student_index = shared_mem->mark_counter;// get the student to mark
 
-            // Lock the current TA's semaphore and the next one
-            semaphore_wait(sem_id, TA_id);
-            semaphore_wait(sem_id, (TA_id + 1) % TA_NUM);
-
-            // Access shared memory
-            int student_index = shared_mem->mark_counter;
-            if (student_index >= STUDENTS_NUM) {
-                shared_mem->mark_counter = 0;
-                semaphore_signal(sem_id, TA_id);
-                semaphore_signal(sem_id, (TA_id + 1) % TA_NUM);
-                semaphore_signal(limit_access_id, 0);
-                break;
-            }
-
+        if (student_index >= STUDENTS_NUM || shared_mem->students[student_index].id == 9999) {
+            shared_mem->mark_counter = 0;
+            marking_times++;
+            printf("resetting and starting over.\n"); 
+        }else{
+            // select the student to mark
             int student_id = shared_mem->students[student_index].id;
             shared_mem->mark_counter++;
+            printf("TA %d is marking student %d \n",(TA_id+1), student_id);
+        // Simulate marking process
+            sleep(rand()% 4+1); // delay
 
-            printf("TA %d is marking student %d\n", TA_id + 1, student_id);
-
-            // Release semaphores after selecting the student
-            semaphore_signal(sem_id, TA_id);
-            semaphore_signal(sem_id, (TA_id + 1) % TA_NUM);
-            semaphore_signal(limit_access_id, 0);
-
-            // Simulate marking process
+        //mark the student
             int mark = rand() % 11;
             shared_mem->students[student_index].mark = mark;
 
-            // Write to the TA's file
+        // Write to the TA's file
             char filename[20];
             sprintf(filename, "TA%d.txt", TA_id + 1);
             FILE *file = fopen(filename, "a");
@@ -187,15 +171,13 @@ void TA_marking(int TA_id){
             } else {
                 perror("File write error");
             }
-
-            // Simulate marking delay
-            sleep(rand() % 4 + 1);
-
-            // Restart marking if the end marker is reached
-            if (student_id == 9999) {
-                break;
-            }
+        //simulate marking process
+            sleep(rand()%10+1);
         }
+        semaphore_signal(sem_id, (TA_id + 1) % TA_NUM);
+        semaphore_signal(sem_id, TA_id);
+        semaphore_signal(limit_access_id, 0);
+        //printf("TA %d released Semaphore %d and Semaphore %d\n", TA_id + 1, (TA_id + 1) % TA_NUM, TA_id);
     }
 }
 
@@ -207,15 +189,8 @@ int main(){
     
     srand(time(NULL));
 
-    //printf("Testing6\n");
     semaphore_init();
-
-      //create shared memory for the student list 
-    //printf("Testing7\n");
     create_shared_memory();
-
-       // load the students inti shared memory
-    //printf("Testing5\n");
     read_data_file();
 
 
@@ -226,9 +201,7 @@ int main(){
         pid_t pid = fork();
         if(pid == 0){
             // child process TA
-            printf("TA %d is about to mark\n", i+1);
             TA_marking(i);
-            printf("TA %d is done\n", i+1);
             exit(EXIT_SUCCESS); 
         }
 
