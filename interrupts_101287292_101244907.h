@@ -80,7 +80,7 @@ Queue* create_queue(Process ** processes, Process *late_processes[15]);
 
 Process* dequeue(Queue *ready_queue);
 
-void enqueue(Queue *ready_queue, Process* process);
+void enqueue(Queue *ready_queue, Process* process, int scheduler);
 
 void display_ready_queue(Queue *ready_queue);
 
@@ -88,10 +88,10 @@ void display_ready_queue(Queue *ready_queue);
 void running_to_ready(FILE *execution_file, Process *process, int current_time);
 
 //service processes that are currently waiting
-void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time);
+void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time, int scheduler);
 
 //this function returns false when there is no more late processes to load
-bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory);
+bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory, int scheduler);
 
 void increment_waiting_times(Queue *ready_queue);
 

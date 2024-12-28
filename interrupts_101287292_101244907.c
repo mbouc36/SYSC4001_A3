@@ -107,7 +107,7 @@ Queue* create_queue(Process** processes, Process *late_processes[15]){
 }
 
 //FOR EP when adding to queue we need to know the value of the current process to know if we should preept it
-void enqueue(Queue *ready_queue, Process* process){
+void enqueue(Queue *ready_queue, Process* process, int scheduler){
     process->next = NULL;
     
     //set process as next head
@@ -117,53 +117,83 @@ void enqueue(Queue *ready_queue, Process* process){
         
     } else {
         Process *p = ready_queue->head;
+
+        if (scheduler == EP){
+            while (process->pid > p->pid){
+                //reached tail
+                if (p->next == NULL){
+                    p->next = process;
+                    ready_queue->tail = process;
+                    process->next = NULL;
+                    break; 
+                } else if (process->pid > p->next->pid){ 
+                    p = p->next;
+                } else {
+                    process->next = p->next;
+                    p->next = process;
+                    break;
+                }
+                
+            } 
+
+            //new process is head
+            if (process->pid < ready_queue->head->pid){
+                process->next = ready_queue->head;
+                ready_queue->head = process;
+            }  
         
-        //place the new process in according to it's arrival time
-        while (process->arrival_time > p->arrival_time){
-            
-                    //reached tail
-                    if (p->next == NULL){
-                        p->next = process;
-                        ready_queue->tail = process;
-                        process->next = NULL;
-                        break; 
 
-                        //current process arrives later then the next process, note if the arrival time is the same we want to place it before
-                    } else if (process->arrival_time > p->next->arrival_time){ 
-                        p = p->next;
-                    } else { //current process has found it position
-                        process->next = p->next;
-                        p->next = process;
-                        break;
-                    }
 
-        }
+        } else { //if schuler is FCFS or RR
+            //place the new process in according to it's arrival time
+            while (process->arrival_time > p->arrival_time){
+                
+                        //reached tail
+                        if (p->next == NULL){
+                            p->next = process;
+                            ready_queue->tail = process;
+                            process->next = NULL;
+                            break; 
 
-        //now place the process based on pid
+                            //current process arrives later then the next process, note if the arrival time is the same we want to place it before
+                        } else if (process->arrival_time > p->next->arrival_time){ 
+                            p = p->next;
+                        } else { //current process has found it position
+                            process->next = p->next;
+                            p->next = process;
+                            break;
+                        }
 
-        
-        while (process->pid > p->pid && process->arrival_time == p->arrival_time){
-            //reached tail
-            if (p->next == NULL){
-                p->next = process;
-                ready_queue->tail = process;
-                process->next = NULL;
-                break; 
-            } else if (process->arrival_time == p->next->arrival_time && process->pid > p->next->pid){ //buggy here, should be checking activation time too so we don't put something that came first ahead
-                p = p->next;
-            } else {
-                process->next = p->next;
-                p->next = process;
-                break;
             }
-            
-        } 
 
-        //new process is head
-        if (process->arrival_time < ready_queue->head->arrival_time || (process->arrival_time == ready_queue->head->arrival_time && process->pid < ready_queue->head->pid)){
-            process->next = ready_queue->head;
-            ready_queue->head = process;
-        } 
+            //now place the process based on pid
+
+            
+            while (process->pid > p->pid && process->arrival_time == p->arrival_time){
+                //reached tail
+                if (p->next == NULL){
+                    p->next = process;
+                    ready_queue->tail = process;
+                    process->next = NULL;
+                    break; 
+                } else if (process->arrival_time == p->next->arrival_time && process->pid > p->next->pid){ //buggy here, should be checking activation time too so we don't put something that came first ahead
+                    p = p->next;
+                } else {
+                    process->next = p->next;
+                    p->next = process;
+                    break;
+                }
+                
+            } 
+
+            //new process is head
+            if (process->arrival_time < ready_queue->head->arrival_time || (process->arrival_time == ready_queue->head->arrival_time && process->pid < ready_queue->head->pid)){
+                process->next = ready_queue->head;
+                ready_queue->head = process;
+            }  
+        }
+        
+
 
     }
     ready_queue->size++;
@@ -355,7 +385,7 @@ void running_to_ready(FILE *execution_file, Process *process, int current_time){
 }
 
 //this function returns false when there is no more late processes to load
-bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory){
+bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** partitions_array, Queue *ready_queue, Process *late_processes[15], int current_time, int *total_free_memory, int scheduler){
     bool any_late_process = false;
     for (int i = 0; i < 15 ;i++){
         if (late_processes[i] != NULL){        
@@ -363,7 +393,7 @@ bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** pa
                 any_late_process = true;
                 late_processes[i]->current_state_time--;
             } else {
-                enqueue(ready_queue, late_processes[i]);
+                enqueue(ready_queue, late_processes[i], scheduler);
                 late_processes[i]->current_state_time = late_processes[i]->IO_duration;
                 //before we create the process we need to find a memeory address
                 int best_partition_index = find_partition(late_processes[i]->size, late_processes[i]->pid, partitions_array);
@@ -383,14 +413,14 @@ bool load_late_processes(FILE *execution_file, FILE *memory_file, Partition** pa
 }
 
 
-void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time){
+void service_waiting(FILE *execution_file, Process *waiting_array[15], int *processes_waiting, Queue *ready_queue, int current_time, int scheduler){
     if (*processes_waiting > 0){
             for (int i = 0; i < 15; i++){
                 if (waiting_array[i] != NULL){
                     Process *process = waiting_array[i]; 
                     process->current_state_time--;
                     if (process->current_state_time == 0){
-                        enqueue(ready_queue, process);
+                        enqueue(ready_queue, process, scheduler);
                         process->current_state_time = process->IO_duration;
                         waiting_array[i] = NULL; // clear position in array
                         (*processes_waiting)--;
@@ -490,7 +520,7 @@ int main(int argc, char *argv[]){
         if (running_process == NULL){
             //queue is empty but could fill if a process is finished with IO
             if (ready_queue->size == 0){
-                service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+                service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time, scheduler);
 
             } 
 
@@ -507,14 +537,14 @@ int main(int argc, char *argv[]){
         
 
         if (any_late_process){
-            any_late_process = load_late_processes(execution_file, memory_file, partitions_array, ready_queue, late_processes, current_time, &total_free_memory);
+            any_late_process = load_late_processes(execution_file, memory_file, partitions_array, ready_queue, late_processes, current_time, &total_free_memory, scheduler);
         }
         increment_waiting_times(ready_queue);
         if (!no_process_running){
             running_process->cpu_time--;
             next_IO--;
             quantum--;
-            service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time);
+            service_waiting(execution_file, waiting_array, &processes_waiting, ready_queue, current_time,  scheduler);
             if (next_IO == 0){
                 running_to_waiting(execution_file, running_process, current_time);
                 waiting_array[processes_waiting] = running_process;
@@ -528,20 +558,12 @@ int main(int argc, char *argv[]){
                 total_num_processes--;            
             } else if (scheduler == RR && quantum == 0){
                 running_to_ready(execution_file, running_process, current_time);
-                enqueue(ready_queue, running_process);
+                enqueue(ready_queue, running_process,  scheduler);
                 printf("Running process finishes it's quantum\n");
                 running_process = NULL;
             }
 
             if (ready_queue->size > 0 ){
-                //should we preempt
-                if (scheduler == EP && running_process != NULL &&  ready_queue->head->pid < running_process->pid){
-                    running_to_ready(execution_file, running_process, current_time);
-                    enqueue(ready_queue, running_process);
-                    running_process = NULL;
-
-                }
-                
                 if (running_process == NULL){
                     running_process = dequeue(ready_queue);
                     ready_to_running(execution_file, running_process, current_time);

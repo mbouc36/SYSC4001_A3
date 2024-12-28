@@ -2,7 +2,6 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -22,27 +21,11 @@ void signal(int semid){ //similar to wait
 }
 
 
-int all_children_exited() {
-    int status;
-    pid_t pid;
 
-    // Loop to reap all child processes
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        printf("Child process with PID %d exited.\n", pid);
-    }
-
-    // If waitpid returns 0, there are still active children
-    if (pid == 0) {
-        return 0; 
-    }
-
-    if (pid == -1) {
-        return 1; // All children have exited
-    }
-
-    return 0; 
-}
-
+typedef struct SharedMemory {
+    int students[20];
+    int running_processes;
+}SharedMemory;
 
 int main(void){
 
@@ -54,7 +37,9 @@ int main(void){
     int sem_3 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
     int sem_4 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
     int sem_5 = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
+    int sem_parent = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
     int global_sem = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT); //ensures 2 processes can run at the same time
+    int shared_sem = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
 
 
 
@@ -64,11 +49,15 @@ int main(void){
     semctl(sem_3, 0, SETVAL, 0);
     semctl(sem_4, 0, SETVAL, 0);
     semctl(sem_5, 0, SETVAL, 0);
+    semctl(sem_parent, 0, SETVAL, 0);
     semctl(global_sem, 0, SETVAL, 2);
+    semctl(shared_sem, 0, SETVAL, 1);
 
-
-    
-
+    //shared memory
+    key_t key = ftok("shmfile", 65); // generates unique queue for shared memeory
+    int shmid = shmget(key, 20 * sizeof(int), 0666 | IPC_CREAT); // allocates a shared memory segment or accesses it if already created
+    SharedMemory *shm  = (SharedMemory *)shmat(shmid, NULL, 0);
+    shm->running_processes = 5; // we have 5 runing processes
 
     //place students from input file into array
     FILE *student_file = fopen("student_database.txt", "r");
@@ -85,12 +74,11 @@ int main(void){
     }
 
     int student_num;
-    int students[20];
     int index = 0;
     char line[256];
     while (fgets(line, sizeof(line), student_file)){
         if (sscanf(line, "%d", &student_num)){
-            students[index] = student_num;
+            shm->students[index] = student_num;
             index++;
         }
     }
@@ -128,9 +116,16 @@ int main(void){
                 wait(semaphores[i]);
                 wait(global_sem);
 
+                //part d implmnentation
+                if (semctl(semaphores[(i + 1)% 5], 0, GETVAL) == 0){
+                    signal(semaphores[i]);
+                    signal(semaphores[(i + 1)% 5]);
+
+                }
+                
                 //fetch current student
                 printf("I am TA %d and I am accessing the database\n", i + 1);
-                current_student = students[j];
+                current_student = shm->students[j];
                 sleep(rand() % 3 + 1);
 
                 //pass grade to output file 
@@ -143,7 +138,14 @@ int main(void){
                     j = -1; // reset j
                     num_times_ran++;
                     if (num_times_ran == 3){
-                        signal(semaphores[(i + 1) % 5]);
+                        wait(shared_sem);
+                        shm->running_processes--;
+                        if (shm->running_processes == 0){
+                            signal(sem_parent);
+                        } else {
+                            signal(semaphores[i + 1]);
+                        }
+                        signal(shared_sem);
                         signal(global_sem);
                         printf("I am process %d, and I am exiting\n", i + 1);
                         exit(0);
@@ -152,7 +154,7 @@ int main(void){
                 
             
                 signal(global_sem);
-                signal(semaphores[(i + 1) % 5]);
+                signal(semaphores[(i + 1)% 5]);
                 
 
             }
@@ -160,11 +162,14 @@ int main(void){
         }
     }
 
+    wait(sem_parent);
 
-    while(!all_children_exited()){
-        sleep(1);
+    //detach shared memory
+    if (shmdt(shm) == -1) {
+        perror("shmdt");
+        exit(1);
     }
-
+    shmctl(shmid, IPC_RMID, NULL);
 
     return 0;
 }
